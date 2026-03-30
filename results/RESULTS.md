@@ -17,10 +17,12 @@ These results represent a **worst-case scenario** for the MimicScribe pipeline. 
 
 ## Summary
 
-| Corpus | Files | DER | Missed | False Alarm | Confusion |
-|--------|------:|----:|-------:|------------:|----------:|
-| ami | 16 | 37.7% | 17.2% | 10.7% | 9.8% |
-| earnings21 | 11 | 17.4% | 0.5% | 13.7% | 3.2% |
+DER is the sum of three error types. **Confusion** (speaker assignment error) is the most relevant metric for diarization quality — it measures how often speech is attributed to the wrong speaker. **False Alarm** is inflated by the pipeline's sentence-level segments spanning silent gaps (see above). **Missed** is speech that was not detected at all.
+
+| Corpus | Files | DER | Confusion (speaker error) | False Alarm (segment boundaries) | Missed |
+|--------|------:|----:|--------------------------:|--------------------------------:|-------:|
+| ami | 16 | 37.7% | 9.8% | 10.7% | 17.2% |
+| earnings21 | 11 | 17.4% | 3.2% | 13.7% | 0.5% |
 
 ## Baseline Comparison
 

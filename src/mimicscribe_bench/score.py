@@ -258,8 +258,14 @@ def render_readme(
         "",
         "## Summary",
         "",
-        "| Corpus | Files | DER | Missed | False Alarm | Confusion |",
-        "|--------|------:|----:|-------:|------------:|----------:|",
+        "DER is the sum of three error types. **Confusion** (speaker assignment error) is the"
+        " most relevant metric for diarization quality — it measures how often speech is"
+        " attributed to the wrong speaker. **False Alarm** is inflated by the pipeline's"
+        " sentence-level segments spanning silent gaps (see above). **Missed** is speech"
+        " that was not detected at all.",
+        "",
+        "| Corpus | Files | DER | Confusion (speaker error) | False Alarm (segment boundaries) | Missed |",
+        "|--------|------:|----:|--------------------------:|--------------------------------:|-------:|",
     ]
 
     for r in results:
@@ -268,9 +274,9 @@ def render_readme(
         lines.append(
             f"| {r.corpus} | {len(r.files)} "
             f"| {r.aggregate_der:.1%} "
-            f"| {r.aggregate_missed:.1%} "
+            f"| {r.aggregate_confusion:.1%} "
             f"| {r.aggregate_false_alarm:.1%} "
-            f"| {r.aggregate_confusion:.1%} |"
+            f"| {r.aggregate_missed:.1%} |"
         )
 
     # Baseline comparison
