@@ -239,30 +239,26 @@ def render_readme(
         "",
         "## Benchmark vs Production",
         "",
-        "These results represent a **worst-case scenario** for the MimicScribe pipeline."
-        " In normal use, the pipeline has several advantages not available in this benchmark:",
+        "These results are a **worst-case scenario**. In production, the pipeline has"
+        " advantages unavailable here:",
         "",
-        "- **Mic/system audio separation**: MimicScribe captures the user's microphone and"
-        " system audio (remote participants) as separate streams. This gives the diarization"
-        " a free speaker separation signal — the primary user is always identified from the"
-        " mic channel, and remote speakers are a distinct pool. In this benchmark, all speakers"
-        " come from a single mixed audio file with no channel distinction.",
-        "- **Voice profiles**: Users can save voice profiles that provide verified speaker"
-        " recognition with high confidence. The benchmark has no saved profiles.",
-        "- **Meeting context**: Users can provide prep context (e.g., \"Meeting with Alice and"
-        " Bob about Q3\") that helps the LLM identify speakers. The benchmark has no context.",
-        "- **Segment granularity**: The pipeline outputs sentence-level segments because that's"
-        " what users read. DER penalizes this heavily — silent gaps within a sentence count as"
-        " false alarm — but it is a deliberate UX choice, not a diarization failure. This"
-        " accounts for the majority of the false alarm rate.",
+        "- **Mic/system audio separation**: MimicScribe captures mic and system audio"
+        " (remote participants) as separate streams, giving diarization a free speaker"
+        " separation signal. This benchmark uses a single mixed file with no channel distinction.",
+        "- **Voice profiles**: Users can save voice profiles for verified speaker recognition."
+        " The benchmark has no saved profiles.",
+        "- **Meeting context**: Users can provide prep context that helps the LLM identify"
+        " speakers. The benchmark has no context.",
+        "- **Segment granularity**: The pipeline outputs sentence-level segments for readability."
+        " Silent gaps within a sentence count as false alarm in DER, but this is a deliberate"
+        " UX choice — it accounts for most of the false alarm rate.",
         "",
         "## Summary",
         "",
-        "DER is the sum of three error types. **Confusion** (speaker assignment error) is the"
-        " most relevant metric for diarization quality — it measures how often speech is"
-        " attributed to the wrong speaker. **False Alarm** is inflated by the pipeline's"
-        " sentence-level segments spanning silent gaps (see above). **Missed** is speech"
-        " that was not detected at all.",
+        "DER is the sum of three components. **Confusion** — speech attributed to the wrong"
+        " speaker — is the most meaningful quality signal. **False Alarm** is inflated by"
+        " sentence-level segments spanning silent gaps (see above). **Missed** is undetected"
+        " speech.",
         "",
         "| Corpus | Files | DER | Confusion (speaker error) | False Alarm (segment boundaries) | Missed |",
         "|--------|------:|----:|--------------------------:|--------------------------------:|-------:|",

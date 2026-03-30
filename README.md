@@ -21,7 +21,7 @@ See [results/RESULTS.md](results/RESULTS.md) after running the benchmark.
 - **MimicScribe** built and run at least once (to download CoreML ASR + diarization models)
 - **Gemini API key** configured in the project root `.env` file (the pipeline calls Gemini for speaker attribution)
 - **Python 3.10+** for the benchmark harness
-- **HuggingFace token** (optional) — may be required for Earnings-21 audio download if the dataset becomes gated. Set `HF_TOKEN` or `HUGGINGFACE_PAT_READ` in `.env`.
+- **HuggingFace token** (optional) — required if Earnings-21 becomes gated. Set `HF_TOKEN` or `HUGGINGFACE_PAT_READ` in `.env`.
 
 ## Quick Start
 
@@ -64,10 +64,8 @@ bench-score --corpus ami
 ## How It Works
 
 1. **Download**: Fetches audio + ground-truth RTTM files from AMI and Earnings-21
-2. **Run**: Processes each audio file through `swift run mimicscribe --process-file` (ASR + diarization + Gemini LLM speaker attribution), then extracts the post-attribution segments from the SQLite database as hypothesis RTTM files
+2. **Run**: Runs each audio file through `swift run mimicscribe --process-file` (ASR + diarization + Gemini speaker attribution), then exports segments from SQLite as hypothesis RTTM files
 3. **Score**: Compares hypothesis RTTM against reference RTTM using pyannote.metrics, renders results to `results/RESULTS.md`
-
-The hypothesis segments reflect the full pipeline output — including the Gemini speaker attribution pass that consolidates over-segmented speakers and assigns human-readable names.
 
 ## Attribution
 
