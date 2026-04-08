@@ -2,7 +2,7 @@
 
 Evaluates the real-time meeting assistant briefing system in [MimicScribe](https://mimicscribe.app). The assistant generates talking points, action items, question detection, and interpersonal awareness suggestions during live meetings.
 
-53 scenarios are run 3 times each against the production prompt. Each run is scored by a combination of deterministic assertions and LLM-as-judge (Claude Sonnet) semantic evaluation.
+59 scenarios are run 3 times each against the production prompt. Each run is scored by a combination of deterministic assertions and LLM-as-judge (Claude Sonnet) semantic evaluation.
 
 ## Models
 
@@ -13,6 +13,17 @@ Evaluates the real-time meeting assistant briefing system in [MimicScribe](https
 | Judge | Claude Sonnet | — | LLM-as-judge for semantic assertions |
 
 ## What's Tested
+
+### Hallucination (6 scenarios)
+
+Targeted tests for specific hallucination failure modes:
+
+- **Prepared context bleeding**: Internal notes (e.g., "Laura was previously at Snowflake — use this to build rapport") must not surface as talking points when the conversation hasn't touched the topic
+- **Number/date mutation**: Dense financial transcripts with many similar numbers ($48K, $62K, $35K, $180K). Every number in the output must exactly match a source.
+- **Speaker name fabrication**: Anonymous remote participants must not be given invented names. Generic references ("the prospect", "the client") are required when no name is available.
+- **Similar numbers across topics**: Multi-product pricing discussions where numbers could be confused across products (e.g., $24/seat vs $15/monitor vs $850/month).
+- **Partial transcript**: Early meetings with minimal context. The model must not fill gaps with plausible-sounding fabricated details.
+- **Competitor context**: Prepared context mentions a competitor (e.g., "They evaluated Otter.ai") but the transcript doesn't. The model should not surface competitor names unless the conversation creates an opening.
 
 ### Goal Tracking (13 scenarios)
 
@@ -77,6 +88,8 @@ Semantic evaluation where interpretation is required:
 | Rubric | What it evaluates |
 |--------|-------------------|
 | Hallucination | No fabricated names, numbers, dates, or claims beyond all provided context |
+| No Fabricated Names | Speaker names in output must trace to a source; generic references required for unnamed speakers |
+| Numbers Preserved | Every number, price, percentage, and date exactly matches a source (formatting changes OK) |
 | No Summarization | Talking points propose forward actions, not recaps of what was said |
 | Action Items Grounded | Every item traces to an explicit verbal commitment |
 | Due Dates Grounded | Every due date maps to a time reference in the transcript |

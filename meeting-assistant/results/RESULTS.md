@@ -2,242 +2,212 @@
 
 Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
 
-Run date: 2026-04-08 | 53 scenarios | 3 runs each
+Run date: 2026-04-08 | 59 scenarios | 3 runs each
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Scenarios | 53 |
-| Assertions passed | 204 / 221 (92%) |
-| **Composite score** | **94.4%** |
-| Avg latency | 1664ms |
-| p50 / p95 / p99 latency | 1647ms / 2342ms / 2587ms |
+| Scenarios | 59 |
+| Assertions passed | 222 / 248 (89%) |
+| **Composite score** | **94.0%** |
+| Avg latency | 1671ms |
+| p50 / p95 / p99 latency | 1642ms / 2253ms / 3248ms |
 | Stability (cross-run consistency) | 88% avg |
-| Action items extracted | 160 (125 with due dates) |
+| Action items extracted | 161 (127 with due dates) |
 
-## Hallucination
+## Hallucination (Targeted)
 
-**12/12 passed (100%)** across all complex and long meeting scenarios.
+**6 scenarios** | **25/27 assertions** | **96% avg composite**
 
-Every name, number, date, product, and technical claim in the assistant's output is verified against the transcript, prepared context, meeting summary, and previous action items. Claude Sonnet evaluates each run independently.
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Hallucination: prepared context bleeding into summary (enterprise deal) | 100% | 6/6 | 1707ms | 97% |
+| :white_check_mark: Hallucination: number/date mutation in dense financial discussion | 100% | 4/4 | 1608ms | 88% |
+| :white_check_mark: Hallucination: speaker name fabrication (anonymous remote participants) | 100% | 5/5 | 1695ms | 86% |
+| :white_check_mark: Hallucination: similar numbers across topics (confusion risk) | 100% | 4/4 | 1426ms | 92% |
+| :white_check_mark: Hallucination: partial transcript with sparse context (early meeting) | 100% | 4/4 | 1504ms | 92% |
+| :large_orange_diamond: Hallucination: context mentions competitor but transcript doesn't | 78% | 2/4 | 1882ms | 86% |
 
-Tested on enterprise sales negotiations with multi-product pricing, sprint planning with framework-specific jargon, board meetings with financial metrics, and 90-minute meetings with 8 speakers.
+**Failures:**
 
-**Pass** (enterprise deal, hybrid deployment discussion):
+- [67%] [critical] Hallucination: context mentions competitor but transcript doesn't -- No hallucination (LLM judge)
+- [67%] [critical] Hallucination: context mentions competitor but transcript doesn't -- No fabricated names (LLM judge)
 
-```
-- Confirm **Kafka** consumer group compatibility with webhook events.
-- Ask about **dead-letter queue** retry window configuration.
+## Goal Tracking & Forward-Looking
 
----
-- **Webhook** architecture supports arbitrary headers for correlation IDs.
-- **Schema versioning** uses semver in the payload envelope.
-- Retry logic includes **exponential backoff with jitter** (3 retries, 30s default).
-```
+**9 scenarios** | **42/44 assertions** | **96% avg composite**
 
-Every term (Kafka, dead-letter queue, semver, 30s) appears in the transcript. No fabricated details.
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Goal: budget never discussed (30-min call) | 100% | 4/4 | 1656ms | 93% |
+| :white_check_mark: Goal: both budget and timeline covered | 100% | 5/5 | 1857ms | 88% |
+| :white_check_mark: Goal: timeline discussed, budget missing (mid-call) | 100% | 4/4 | 1633ms | 97% |
+| :large_orange_diamond: Forward-looking: don't parrot recent exchange | 78% | 4/5 | 1508ms | 83% |
+| :white_check_mark: Forward-looking: suggest what hasn't been covered | 100% | 4/4 | 1557ms | 89% |
+| :white_check_mark: Wrap-up: unaddressed budget goal with closing signals (should be first bullet) | 100% | 5/5 | 1546ms | 91% |
+| :white_check_mark: Wrap-up: two goals unaddressed, meeting ending abruptly | 100% | 5/5 | 1318ms | 83% |
+| :large_orange_diamond: Wrap-up: all goals met, no false resurfacing | 90% | 3/4 | 1472ms | 92% |
+| :white_check_mark: Long meeting: compacted summary + recent window, quality stable | 100% | 8/8 | 1868ms | 90% |
 
-**What a failure looks like** (not from this run -- illustrative):
+**Failures:**
 
-```
-- Ask about their **Datadog** integration requirements.
-```
-
-Flagged because "Datadog" was never mentioned in the transcript or context. The model inferred a monitoring tool from context clues but fabricated the specific product name.
-
-## Forward-Looking Talking Points
-
-**41/41 passed (100%)**
-
-Talking points must propose what the user should say, ask, or do next. Recapping what was already discussed is a failure. The judge evaluates each bullet independently -- a single backward-looking bullet ("You mentioned the Q2 timeline") among forward-looking ones fails the assertion.
-
-**Pass** (renewal call, pricing discussed):
-
-```
-- Confirm **annual billing** discount for **200 users**.
-- Ask about their **timeline** for implementation.
-```
-
-Both bullets propose next actions. Neither restates what was said.
-
-**Fail** (complex scenario, 33% pass rate):
-
-```
-- **Elliot** decided to cut **Constellation** from the sprint.
-```
-
-This restates a decision already made in the transcript rather than suggesting a next step. It should have been omitted or reframed as a follow-up (e.g., "Confirm Constellation cut with stakeholders").
-
-## Goal Tracking
-
-**17/19 passed (89%)** | 13 scenarios
-
-When the user sets a meeting goal (e.g., "discuss budget and timeline"), the assistant must surface unaddressed goals as talking points. If a goal has been substantively discussed, no reminder should appear.
-
-**Pass** (budget never discussed, 30-minute call):
-
-```
-- Ask about **budget** -- not yet discussed.
-```
-
-Budget was set as a goal but never came up. The assistant surfaces it.
-
-**Fail** (both goals met, 67% pass rate):
-
-```
-- Ask about **budget** -- not yet discussed.
-```
-
-Budget was actually discussed with specific numbers in the transcript. The model missed the coverage and generated a false reminder.
-
-## Action Items
-
-**9/10 passed (90%)** | 4 non-incremental scenarios
-
-Action items must trace to explicit verbal commitments ("I will", "I'll send"). Brainstorming ("we should", "we could") and casual suggestions must not produce items. Due dates must map to time references in the transcript.
-
-**Pass** (mixed commitments and brainstorming):
-
-```json
-[
-  {"owner": "you", "task": "Send diagnostic tool credentials and cert matrix", "due": "2026-04-10"},
-  {"owner": "Remote", "task": "Run diagnostic tool across three customer environments"}
-]
-```
-
-Both items correspond to explicit "I'll send" / "we will run" commitments. Brainstorming items ("We might want to do a webinar") correctly excluded.
-
-**Fail** (due date grounding, 67% pass rate):
-
-```json
-{"task": "Send SOC 2 report to Sarah", "due": "2026-04-09"}
-```
-
-The transcript said "by end of day Thursday" but the resolved date didn't match the actual Thursday. The judge flagged the date as ungrounded.
-
-## Incremental Action Items
-
-**8/8 passed (100%)** | 5 scenarios
-
-When the assistant is triggered multiple times during a meeting, previous action items are passed back in. The model must preserve them unless the transcript explicitly cancels, reassigns, or updates them. No duplicates allowed.
-
-**Pass** (transcript cancels an item):
-
-Previous items included "Coordinate joint webinar with partner marketing team." Transcript: "We're not going to do the joint webinar after all. Marketing decided to go a different direction."
-
-```json
-[
-  {"owner": "you", "task": "Send integration documentation", "due": "2026-04-08"},
-  {"owner": "Remote", "task": "Share test results from three customer environments", "due": "2026-04-13"}
-]
-```
-
-Webinar item correctly removed. Other items preserved with original dates.
-
-**Pass** (transcript updates a deadline):
-
-Previous: "Send diagnostic credentials by Friday." Transcript: "I won't be able to get you the credentials by Friday... I should have it sorted by next Wednesday."
-
-```json
-{"owner": "you", "task": "Send diagnostic tool credentials and certification test matrix to Flux", "due": "2026-04-15"}
-```
-
-Deadline updated from Friday to Wednesday. No duplicate created alongside the old version.
-
-## Question Detection
-
-**15/16 passed (93%)** | 7 scenarios
-
-Only questions from remote speakers are surfaced. Questions asked by the user (You/Mic) are excluded -- those are the user's own questions, not prompts they need to respond to. A question is considered answered if any subsequent speaker addresses it.
-
-**Pass** (unanswered remote question):
-
-Transcript ends with: `[Remote] What about failover? Do you have multi-region redundancy?`
-
-```
-❓ Do you have multi-region redundancy for failover?
-```
-
-Correctly surfaced -- asked by Remote, not yet answered.
-
-**Pass** (user's own question, answered):
-
-User asked: `[You/Mic] When do we expect a recommendation?`
-Remote answered: `End of next week.`
-
-No ❓ line in output. Correctly suppressed -- the user asked it, and it was answered.
-
-**Fail** (remote deflects, 33% pass rate):
-
-Remote says "Can we circle back on that?" -- a deflection, not a real answer. The model sometimes surfaces the user's preceding question instead of recognizing the deflection as the unanswered remote request.
+- [0%] [major] Forward-looking: don't parrot recent exchange -- No parroting 'native connectors' in talking points
+- [67%] [major] Wrap-up: all goals met, no false resurfacing -- No pricing reminder (already confirmed)
 
 ## Interpersonal Awareness
 
-**47/48 passed (98%)** | 12 scenarios
+**12 scenarios** | **44/48 assertions** | **96% avg composite**
 
-The assistant detects tension, defensiveness, and disengagement from transcript text and acoustic signals (overlap, speech rate, response latency). Equally important: it must NOT flag positive dynamics. Enthusiasm, collaborative overlaps, fast technical discussion, and natural turn-taking are not risks.
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Interpersonal: overlap during disagreement (annotated) | 100% | 5/5 | 2020ms | 88% |
+| :white_check_mark: Interpersonal: overlap during disagreement (baseline, no annotations) | 100% | 3/3 | 1845ms | 98% |
+| :white_check_mark: Interpersonal: fast speech during pricing pushback (annotated) | 100% | 4/4 | 1803ms | 95% |
+| :white_check_mark: Interpersonal: combined overlap + fast during heated exchange (annotated) | 95% | 3/4 | 2245ms | 73% |
+| :white_check_mark: Interpersonal: neutral conversation, no annotations | 100% | 3/3 | 1580ms | 88% |
+| :white_check_mark: Interpersonal: overlap during enthusiastic agreement | 100% | 4/4 | 1342ms | 92% |
+| :white_check_mark: Edge: passive agreement with tension acoustic signals | 100% | 4/4 | 1780ms | 87% |
+| :white_check_mark: Edge: fast technical explanation — no tension (false positive risk) | 95% | 3/4 | 2640ms | 91% |
+| :white_check_mark: Edge: excited fast speech on good news — no negative signal | 100% | 5/5 | 1923ms | 91% |
+| :large_orange_diamond: Edge: brief overlap at natural turn boundaries | 71% | 3/4 | 1547ms | 89% |
+| :white_check_mark: Edge: pervasive overlaps in collaborative working session | 100% | 4/4 | 1750ms | 88% |
+| :large_orange_diamond: Edge: text-only disagreement without acoustic signals (regression test) | 90% | 3/4 | 1802ms | 78% |
 
-Acoustic signals are passed in a separate block (not inlined in the transcript) to prevent raw annotation terms from leaking into the output.
+**Failures:**
 
-**Pass** (pricing pushback with fast speech):
-
-Transcript shows a prospect speaking 30% faster than baseline while pushing back on a 15% price increase.
-
-```
-💬 The prospect is frustrated about the pricing increase; acknowledge their concern before presenting alternatives.
-```
-
-Correctly identified tension. No raw annotation data leaked ("fast+30%" does not appear).
-
-**Pass** (enthusiastic agreement with overlaps):
-
-Both speakers talking over each other excitedly about a partnership idea.
-
-No 💬 line in output. Correctly suppressed -- overlapping speech during agreement is not an interpersonal risk.
-
-**Fail** (natural turn overlaps, 0% pass rate):
-
-Brief, polite overlaps at natural turn boundaries (e.g., "Yeah, the team's using it daily now --" / "Good to hear."). The model sometimes flags these as interpersonal dynamics when they're just conversational rhythm. This is the hardest edge case -- distinguishing polite overlap from aggressive interruption without full audio analysis.
-
-## Long Meetings
-
-**21/22 passed (95%)** | 5 scenarios
-
-Simulates 90+ minute meetings using a compacted summary (~300 words), recent transcript window (~400 words), and accumulated previous action items. Tests that the assistant handles context from earlier in the meeting without re-suggesting decided topics or dropping aged-out action items.
-
-Scenarios: 8-speaker company all-hands, enterprise deal negotiation, sprint planning, investor board update.
-
-**Pass** (company all-hands, 8 speakers):
-
-Meeting summary covers revenue update, hiring decisions, product roadmap, and NPS discussion. Recent transcript discusses engineering hiring details.
-
-```
-- Reach out to **Korn Ferry** and **Riviera Partners** this week for recruiting.
-- Ask **Raj** if the infrastructure role could take a strong mid-level engineer.
-
----
-- **Tyler** will deliver onboarding specialist JD by **Wednesday** (moved up from Friday).
-- Engineering hiring requires **distributed systems** specialists, not general full-stack.
-```
-
-All names and details traced to transcript or summary. Previous action items preserved. No re-suggestion of already-decided topics.
+- [0%] [major] Edge: brief overlap at natural turn boundaries -- No interpersonal flag for natural turn overlaps
+- [67%] [minor] Interpersonal: combined overlap + fast during heated exchange (annotated) -- Latency <= 3000ms
+- [67%] [minor] Edge: fast technical explanation — no tension (false positive risk) -- Latency <= 3000ms
+- [67%] [major] Edge: text-only disagreement without acoustic signals (regression test) -- Detects pushback from text alone (no acoustic annotations)
 
 ## Complex Scenarios
 
-**33/43 passed (76%)** | 7 scenarios
+**7 scenarios** | **31/43 assertions** | **85% avg composite**
 
-Long domain-specific transcripts with enterprise sales jargon, financial metrics, and multi-stakeholder dynamics. This is the weakest category -- the model occasionally exceeds the 3-bullet talking point limit and sometimes frames a recap as a talking point on complex multi-topic transcripts.
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Complex: enterprise data observability deal, multi-product with competitor eval | 100% | 6/6 | 2202ms | 90% |
+| :large_orange_diamond: Complex: sprint planning with internal tools, feature scoping, and infra migration | 76% | 4/6 | 1895ms | 86% |
+| :white_check_mark: Complex: hiring committee debrief with rubric scores and bar-raiser veto | 100% | 5/5 | 2066ms | 81% |
+| :large_orange_diamond: Complex: QBR with product issues, trust erosion, and gated expansion | 74% | 4/7 | 1973ms | 76% |
+| :large_orange_diamond: Complex: API integration partnership with hybrid deployment constraints | 82% | 4/6 | 1900ms | 86% |
+| :large_orange_diamond: Complex: Series B board prep with CFO, bridge round debate, margin tension | 82% | 3/6 | 2049ms | 78% |
+| :large_orange_diamond: Complex: attribution dispute, channel budget allocation with competing data | 79% | 5/7 | 1966ms | 87% |
+
+**Failures:**
+
+- [0%] [major] Complex: sprint planning with internal tools, feature scoping, and infra migration -- No summarization as talking points (LLM judge)
+- [0%] [major] Complex: attribution dispute, channel budget allocation with competing data -- Surfaces Sam's model by Friday (next step)
+- [33%] [major] Complex: QBR with product issues, trust erosion, and gated expansion -- No hallucination (LLM judge)
+- [33%] [major] Complex: QBR with product issues, trust erosion, and gated expansion -- No summarization as talking points (LLM judge)
+- [33%] [major] Complex: API integration partnership with hybrid deployment constraints -- Surfaces diagnostic tool action (next step)
+- [67%] [major] Complex: sprint planning with internal tools, feature scoping, and infra migration -- Surfaces Elliot communication (decided to cut Constellation)
+- [67%] [major] Complex: QBR with product issues, trust erosion, and gated expansion -- Surfaces SSO cert action item (Janet)
+- [67%] [major] Complex: API integration partnership with hybrid deployment constraints -- No summarization as talking points (LLM judge)
+- [67%] [major] Complex: Series B board prep with CFO, bridge round debate, margin tension -- Max 3 talking points
+- [67%] [major] Complex: Series B board prep with CFO, bridge round debate, margin tension -- No hallucination of financial details (LLM judge)
+- [67%] [major] Complex: Series B board prep with CFO, bridge round debate, margin tension -- No summarization as talking points (LLM judge)
+- [67%] [major] Complex: attribution dispute, channel budget allocation with competing data -- No summarization as talking points (LLM judge)
+
+## Question Detection
+
+**7 scenarios** | **18/19 assertions** | **89% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Question: unanswered Remote question at end of transcript | 100% | 3/3 | 1417ms | 89% |
+| :white_check_mark: Question: Remote question answered by user — should not surface | 100% | 3/3 | 1291ms | 91% |
+| :white_check_mark: Question: Remote question answered by another Remote — should not surface | 100% | 3/3 | 1352ms | 78% |
+| :white_check_mark: Question: user asks question, gets answer — must NOT surface | 100% | 2/2 | 1401ms | 89% |
+| :white_check_mark: Question: user asks multiple questions, all answered — no question surfaced | 100% | 3/3 | 1467ms | 91% |
+| :x: Question: Remote deflects without answering — question should surface | 25% | 1/2 | 1468ms | 90% |
+| :white_check_mark: Question: rhetorical Remote question — should not surface | 100% | 3/3 | 1719ms | 85% |
+
+**Failures:**
+
+- [0%] [critical] Question: Remote deflects without answering — question should surface -- Question detection correct (LLM judge)
+
+## Action Items
+
+**4 scenarios** | **13/14 assertions** | **97% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :large_orange_diamond: Action items: explicit commitments with due dates (sales call) | 89% | 3/4 | 1653ms | 89% |
+| :white_check_mark: Action items: brainstorming should NOT produce items | 100% | 3/3 | 1425ms | 83% |
+| :white_check_mark: Action items: mixed commitments and vague plans (should extract only commitments) | 100% | 4/4 | 1580ms | 87% |
+| :white_check_mark: Action items: no commitments in casual check-in (should return empty) | 100% | 3/3 | 1330ms | 89% |
+
+**Failures:**
+
+- [67%] [critical] Action items: explicit commitments with due dates (sales call) -- Due dates grounded in transcript (LLM judge)
+
+## Incremental Action Items
+
+**5 scenarios** | **10/11 assertions** | **99% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Action items: incremental — previous items preserved with new transcript | 100% | 2/2 | 1415ms | 87% |
+| :white_check_mark: Action items: incremental — transcript updates deadline on existing item | 95% | 2/3 | 2051ms | 88% |
+| :white_check_mark: Action items: incremental — unrelated new transcript, all previous items preserved | 100% | 2/2 | 1146ms | 80% |
+| :white_check_mark: Action items: incremental with compacted summary — aged-out items retained | 100% | 2/2 | 1515ms | 94% |
+| :white_check_mark: Action items: incremental — transcript cancels a previous item | 100% | 2/2 | 1526ms | 87% |
+
+**Failures:**
+
+- [67%] [minor] Action items: incremental — transcript updates deadline on existing item -- Latency <= 3000ms
+
+## Long Meetings (90+ min)
+
+**4 scenarios** | **14/16 assertions** | **94% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :large_orange_diamond: Long: company all-hands (8 speakers, 90 min) | 89% | 3/4 | 1702ms | 93% |
+| :white_check_mark: Long: enterprise deal negotiation (90 min, 3 speakers) | 100% | 4/4 | 1684ms | 87% |
+| :white_check_mark: Long: product sprint planning (90 min, eng team) | 100% | 4/4 | 1632ms | 87% |
+| :large_orange_diamond: Long: investor board update with CFO tension (90 min) | 89% | 3/4 | 1744ms | 85% |
+
+**Failures:**
+
+- [67%] [critical] Long: company all-hands (8 speakers, 90 min) -- No hallucination (LLM judge)
+- [67%] [critical] Long: investor board update with CFO tension (90 min) -- No hallucination (LLM judge)
+
+## Long Meetings
+
+**1 scenarios** | **5/6 assertions** | **88% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :large_orange_diamond: Long meeting: earlier decisions in summary should not be re-suggested | 88% | 5/6 | 1528ms | 83% |
+
+**Failures:**
+
+- [33%] [major] Long meeting: earlier decisions in summary should not be re-suggested -- Does NOT re-suggest Lighthouse P0 (already decided)
 
 ## Template Compliance
 
-**13/13 passed (100%)** | 2 scenarios
+**2 scenarios** | **13/13 assertions** | **100% avg composite**
 
-Output follows the display template: question line before bullets, interpersonal before divider, summary after divider. Bold formatting on names and numbers. No markdown section headers.
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Template: question detected, full structure expected | 100% | 6/6 | 1861ms | 97% |
+| :white_check_mark: Template: no question, no interpersonal — minimal structure | 100% | 7/7 | 1565ms | 89% |
+
+## Other
+
+**2 scenarios** | **7/7 assertions** | **100% avg composite**
+
+| Scenario | Score | Assertions | Latency | Stability |
+|----------|-------|------------|---------|-----------|
+| :white_check_mark: Edge: very early call, minimal transcript | 100% | 4/4 | 1138ms | 98% |
+| :white_check_mark: Edge: no prepared context | 100% | 3/3 | 1421ms | 84% |
 
 ## Methodology
 
-- **53 scenarios**, 3 runs each (159 total runs)
+- **59 scenarios**, 3 runs each (177 total runs)
 - **Deterministic assertions**: string matching, bullet counts, template structure, annotation leakage detection
 - **LLM judge**: Claude Sonnet evaluates semantic quality (hallucination, grounding, forward-looking, stability)
 - **Composite scoring**: Critical assertions weighted 3x, Major 2x, Minor 1x
