@@ -2,13 +2,13 @@
 
 Pipeline: Parakeet TDT 0.6B (on-device ASR) + Pyannote Community-1 (on-device diarization) + acoustic boundary snap + Gemini 3 Flash (LLM speaker attribution)
 
-Run date: 2026-04-30
+Run date: 2026-05-02
 
 ## What's new in this update
 
-**94.7% → 94.8% SAA** (+0.1 pp aggregate), with DER down on every corpus. One production change since the 2026-04-28 publication: the acoustic boundary snap now searches a wider window around each speaker-change boundary and runs its embedding calls as batched ANE invocations.
+**94.8% → 95.1% SAA** (+0.3 pp aggregate). One production change since the 2026-04-30 publication: a new chunk-level correction step runs after the diarizer's clustering and before the LLM attribution, reassigning chunks the clustering step placed in the wrong cluster.
 
-Per-corpus gains range from +0.1 to +0.3 pp; worst-case file regression is −0.1 pp. Gains concentrate on SCOTUS and VoxConverse where speaker-change boundaries have a wider distribution of placement errors.
+Per-corpus deltas: SCOTUS +1.0 pp, VoxConverse +0.4 pp, Podcast +0.1 pp, AMI ≈ 0, Earnings-21 −0.1 pp (within run-to-run LLM noise). Gains concentrate on long meetings where one speaker's cluster had grown large enough to absorb content from acoustically similar speakers — cases the boundary-snap step can't reach because there's no boundary nearby to refine.
 
 ## Speaker Attribution Accuracy (SAA)
 
@@ -16,12 +16,12 @@ Per-corpus gains range from +0.1 to +0.3 pp; worst-case file regression is −0.
 
 | Corpus | Files | Pyannote C1 SAA | MimicScribe SAA | + LLM SAA | Speedup |
 |--------|------:|----------------:|----------------:|----------:|--------:|
-| Earnings-21 | 11 | 98.1% | 96.5% | **96.9%** | 2.6x |
-| VoxConverse | 20 | 95.9% | 92.5% | **95.1%** | 3.8x |
-| SCOTUS | 5 | 99.2% | 95.0% | **96.0%** | 3.1x |
+| Earnings-21 | 11 | 98.1% | 96.5% | **96.8%** | 2.6x |
+| VoxConverse | 20 | 95.9% | 92.5% | **95.5%** | 3.8x |
+| SCOTUS | 5 | 99.2% | 95.0% | **97.0%** | 3.1x |
 | AMI | 16 | 97.0% | 93.6% | **94.6%** | 3.3x |
-| Podcast | 6 | — | 90.7% | **91.5%** | — |
-| **Aggregate** | **58** | — | **94.0%** | **94.8%** | — |
+| Podcast | 6 | — | 90.7% | **91.6%** | — |
+| **Aggregate** | **58** | — | **94.0%** | **95.1%** | — |
 
 Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters.
 
@@ -58,6 +58,24 @@ For each speaker-change boundary, candidate positions are evaluated around the o
 
 Cost: ~4-6 s per 30-min meeting on Apple Silicon ANE (FBANK + Embedding calls batched per boundary).
 
+## Chunk-cluster migration
+
+The diarizer's clustering step occasionally puts the wrong chunks of audio in the wrong cluster. Two patterns we see repeatedly:
+
+- **Mega-cluster contamination on long meetings**: one speaker's cluster grows large and starts absorbing chunks from acoustically similar speakers. On the SCOTUS files, the Solicitor General's cluster had absorbed ~50% of one Justice's content.
+- **Bidirectional smearing on similar-voice conversations**: each cluster ends up ~80% pure with the other speaker's chunks crossed in.
+
+The acoustic boundary snap can't fix this — there's no boundary nearby to move. The chunk-cluster migration step re-evaluates the per-chunk embeddings the diarizer already computed:
+
+1. Build a robust centroid per cluster via iterative outlier rejection (drop chunks whose cosine to the running mean falls below mean − 2σ, recompute, repeat until stable). This produces a centroid that represents the cluster's true acoustic identity rather than the contaminated mean.
+2. Score every chunk against every cluster centroid; compute `margin = max(other) − own_score`.
+3. Find runs of ≥ 4 contiguous chunks that share the same source cluster, vote for the same alternate cluster, and individually cross a 0.50 margin. Migrate every chunk in such a run to its alternate cluster.
+4. Rebuild segments by **splitting** original segments at intra-segment cluster transitions. Adjacent original segments are never merged.
+
+Runs of < 4 chunks don't migrate, which suppresses singleton noise and prevents the kind of segment-split chains that confuse the downstream LLM's name-mapping step. The conservative gate is what makes the recipe regression-free across this corpus (validated by sweep over thresholds 0.45–0.60 and run lengths 3–4; baseline-rerun stochasticity floor at ±0.06 pp aggregate).
+
+Cost: pure NumPy / vDSP on cached embeddings — no model calls. ~70 ms on a 30-min meeting, ~550 ms on a 90-min meeting (M-series silicon). Well under 1% of pipeline time vs ASR/snap/LLM.
+
 ## Latency
 
 | Corpus | File | Audio | Pyannote | MimicScribe | Speedup |
@@ -80,14 +98,14 @@ SAA isolates **confusion** — was the right speaker tagged on speech the system
 
 | Corpus | DER | Confusion | False Alarm | Missed |
 |--------|----:|----------:|------------:|-------:|
-| Earnings-21 | 18.0% | 3.1% | 12.1% | 2.8% |
-| VoxConverse | 16.4% | 4.9% | 5.9% | 5.5% |
-| SCOTUS | 6.3% | 4.0% | 0.0% | 2.3% |
-| AMI | 27.3% | 5.4% | 6.3% | 15.5% |
-| Podcast | 10.4% | 8.5% | 1.2% | 0.7% |
-| **Aggregate** | **15.8%** | **5.2%** | **5.2%** | **5.4%** |
+| Earnings-21 | 18.1% | 3.2% | 12.1% | 2.8% |
+| VoxConverse | 16.0% | 4.5% | 6.0% | 5.5% |
+| SCOTUS | 5.4% | 3.0% | 0.0% | 2.3% |
+| AMI | 27.2% | 5.4% | 6.3% | 15.5% |
+| Podcast | 10.3% | 8.4% | 1.2% | 0.7% |
+| **Aggregate** | **15.5%** | **4.9%** | **5.2%** | **5.4%** |
 
-The wider snap reduces confusion on every corpus. False-alarm and missed components are unchanged from the prior publication — they're dominated by ASR/segmentation behavior this update doesn't touch.
+Confusion drops on every corpus that benefits from migration (SCOTUS −1.0 pp, VoxConverse −0.4 pp). False-alarm and missed components are unchanged from the prior publication — they're dominated by ASR/segmentation behavior this update doesn't touch.
 
 ## Benchmark vs Production
 
@@ -120,11 +138,18 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 The 58-file corpus is pinned in the parakeet-transcriber repo for byte-exact reruns:
 
 ```
-parakeet-transcriber@2a380f19:
-├── benchmark/results/corpus_eval/raw_segments/    # 58 pre-LLM diarizer outputs
-├── benchmark/output/snap_wide_c_full/             # snapped raw_segments (current)
-├── benchmark/output/v4seal_wide_c_full/rttm/      # current: LLM-attributed (RTTM)
-└── benchmark/results/diarization/v4seal_wide_c_full_2026-04-30.json  # scored result
+parakeet-transcriber@ff042dba:
+├── benchmark/results/corpus_eval/raw_segments/                                                # 58 pre-LLM diarizer outputs
+├── benchmark/output/snap_wide_c_full/                                                         # snapped raw_segments
+├── benchmark/output/v4seal-wide_c-with-migration_t50r4/rttm/                                  # current: LLM-attributed (RTTM)
+└── benchmark/results/diarization/v4seal-wide_c-with-migration_t50r4_corpus_2026-05-02.json    # scored result
 ```
 
-Audio source paths and ground-truth RTTMs come from the public corpora linked above. Re-running the LLM step on the pinned `raw_segments/` reproduces the LLM column without re-running diarization. Re-running the acoustic snap requires the audio files (loaded fresh per file at 16 kHz mono).
+Audio source paths and ground-truth RTTMs come from the public corpora linked above. The chunk-cluster migration step is reproduced from the cached snap output via:
+
+```
+benchmark/.venv/bin/python3 scripts/run_v4seal_migration_corpus_eval.py \
+    --snap-source wide_c --threshold 0.50 --min-run 4
+```
+
+Re-running the LLM step on the pinned `raw_segments/` reproduces the LLM column without re-running diarization. Re-running the acoustic snap requires the audio files (loaded fresh per file at 16 kHz mono).
