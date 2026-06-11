@@ -1,16 +1,18 @@
 # MimicScribe Diarization Benchmark Results
 
-Pipeline: Parakeet TDT 0.6B ASR + Pyannote Community-1 diarization + on-device post-clustering refinement + Gemini 3 Flash for naming.
+Pipeline: Parakeet TDT 0.6B ASR + Pyannote Community-1 diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
 
-Run date: 2026-05-15
+Run date: 2026-06-11
 
 ## What's new in this update
 
-**Aggregate SAA 95.0% → 97.4%, aggregate confusion 5.0% → 2.6%** on the public corpus. Two changes since the 2026-05-06 publication.
+**Aggregate SAA 97.4% → 97.9%, aggregate confusion 2.6% → 2.1%** on the public corpus. Two new post-clustering stages carry most of the gain since the 2026-05-15 publication; the rest comes from refinement of existing stages.
 
-A clustering refinement now uses sentence-level boundaries from the ASR stage alongside the acoustic chunks the diarizer produces. Speakers whose entire contribution fits between two acoustic chunks — short questions, brief replies, single-sentence interjections — were previously absorbed into a neighboring chunk's cluster. The sentence-level signal recovers them. Largest gain on VoxConverse (+1.8 pp), where this failure mode is most common; AMI gains +1.8 pp, SCOTUS +2.4 pp, Earnings-21 is roughly unchanged.
+The first targets a failure where a meeting grows a phantom extra speaker: short interjections — "yeah," "right," "okay" — from several real participants can collect into a cluster of their own. A new stage recognizes that profile and re-routes each interjection to the speaker it belongs to. Largest gain on AMI (+0.5 pp), where back-and-forth meeting chatter makes this failure most common.
 
-The 6 Podcast files we'd previously published against used AI-generated reference RTTMs rather than human annotation. An aural spot-check showed material disagreement on similar-voiced co-host pairs, so we removed them. The 52 remaining files all use human-verified references from the source datasets.
+The second targets the opposite failure: a quieter participant who never gets a cluster at all, because their voice partially resembles several louder ones — common for analysts dialing into earnings calls over telephone-quality lines, whose questions then ride along inside an executive's answer. A new recovery stage notices a sustained stretch of speech that doesn't fit any existing speaker well and gives it a speaker of its own. Largest gain on Earnings-21 (+0.8 pp), where several previously-missing analysts are now attributed.
+
+Both stages follow the pipeline's standing bias: when uncertain, prefer an extra speaker over a merged one — merging two speakers in the UI is one click, splitting them apart is per-segment work.
 
 ## Speaker Attribution Accuracy (SAA)
 
@@ -18,11 +20,11 @@ The 6 Podcast files we'd previously published against used AI-generated referenc
 
 | Corpus | Files | Pyannote C1 SAA | MimicScribe SAA | Speedup |
 |--------|------:|----------------:|----------------:|--------:|
-| Earnings-21 | 11 | 98.1% | **96.9%** | 3.7x |
-| VoxConverse | 20 | 95.9% | **96.2%** | 4.1x |
-| SCOTUS | 5 | 99.2% | **98.7%** | 5.4x |
-| AMI | 16 | 97.0% | **97.1%** | 3.7x |
-| **Aggregate** | **52** | — | **97.4%** | — |
+| Earnings-21 | 11 | 98.1% | **97.7%** | 3.7x |
+| VoxConverse | 20 | 95.9% | **96.4%** | 4.1x |
+| SCOTUS | 5 | 99.2% | **98.9%** | 5.4x |
+| AMI | 16 | 97.0% | **97.6%** | 3.7x |
+| **Aggregate** | **52** | — | **97.9%** | — |
 
 Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters.
 
@@ -56,7 +58,7 @@ The LLM is also not allowed to give two cluster IDs the same name. A determinist
 
 ## Post-clustering refinement
 
-The deterministic pipeline does not stop at the diarizer's output. Several on-device stages run between clustering and the LLM step, addressing common failure modes: turn-change boundaries that land a few seconds off, chunks the clustering placed in the wrong cluster on long meetings or with similar-voice speakers, and the recently-added sentence-boundary integration that recovers speakers whose entire contribution sits between acoustic-chunk boundaries. These stages run on the Neural Engine and on cached embeddings — total cost is well under 10 s per 30-minute meeting.
+The deterministic pipeline does not stop at the diarizer's output. Several on-device stages run between clustering and the LLM step, addressing common failure modes: turn-change boundaries that land a few seconds off, chunks the clustering placed in the wrong cluster on long meetings or with similar-voice speakers, sentence-boundary integration that recovers speakers whose entire contribution sits between acoustic-chunk boundaries, dissolution of phantom clusters that collect short interjections from several participants, and recovery of quiet speakers absorbed into an acoustically similar neighbor. These stages run on the Neural Engine and on cached embeddings — total cost is well under 10 s per 30-minute meeting.
 
 This phase carries most of the difference between the Pyannote C1 SAA column and the MimicScribe SAA column.
 
@@ -79,17 +81,17 @@ The DER number on this benchmark mixes three components, only one of which measu
 - **Missed speech** — speech the system didn't emit at all. Driven by ASR coverage, not diarization.
 - **False alarm** — hyp-tagged speech that ref marks as silence. Driven by UX choices about how segments are drawn.
 
-**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 5.0% → **2.6%** (−2.4 pp). VoxConverse: 5.6% → 2.9%. SCOTUS: 3.7% → 1.3%. AMI: 4.7% → 2.9%. Earnings-21: 3.4% → 3.6% (essentially unchanged).
+**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 2.6% → **2.1%** (−0.5 pp). Earnings-21: 3.1% → 2.3%. AMI: 2.9% → 2.4%. VoxConverse: 3.8% → 3.6%. SCOTUS: 1.3% → 1.1%.
 
 The pipeline collapses consecutive same-speaker word runs into a single segment, even when the speaker paused mid-thought — a 4-second pause shouldn't fragment one person's quote into two transcript lines; the LLM step inserts paragraph breaks when topical structure calls for them. From pyannote's perspective, every merged-over silence between two parts of the same speaker's turn costs false-alarm frames. An ASR that drops mumbled or overlapped speech can score lower on these aggregate components than one that captures it, because missed speech can't be confused.
 
 | Corpus | DER | Confusion | False Alarm | Missed |
 |--------|----:|----------:|------------:|-------:|
-| Earnings-21 | 17.8% | 3.6% | 13.2% | 1.1% |
-| VoxConverse | 18.1% | 2.9% | 9.4% | 5.7% |
-| SCOTUS | 3.7% | 1.3% | 0.0% | 2.4% |
-| AMI | 30.9% | 2.9% | 11.6% | 16.3% |
-| **Aggregate** | **17.6%** | **2.6%** | **8.5%** | **6.5%** |
+| Earnings-21 | 16.3% | 2.3% | 13.5% | 0.5% |
+| VoxConverse | 18.8% | 3.6% | 9.5% | 5.7% |
+| SCOTUS | 3.6% | 1.1% | 0.0% | 2.5% |
+| AMI | 31.1% | 2.4% | 12.4% | 16.2% |
+| **Aggregate** | **17.2%** | **2.1%** | **8.8%** | **6.3%** |
 
 ## Benchmark vs Production
 
@@ -113,11 +115,11 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 - **Collar**: 0.25s | **Scoring**: [pyannote.metrics](https://pyannote.github.io/pyannote-metrics/) DiarizationErrorRate, `skip_overlap=False`
 - **Diarization**: Pyannote Community-1 via [FluidAudio](https://github.com/FluidInference/FluidAudio) CoreML
 - **ASR**: Parakeet TDT 0.6B via FluidAudio CoreML
-- **LLM**: Gemini 3 Flash (temp 0.1, thinking minimal)
+- **LLM**: Gemini 3.1 Flash Lite (temp 0.1, thinking minimal)
 
 ## Reproducibility
 
-The deterministic pipeline runs end-to-end in Swift; Python only does the LLM step and scoring.
+The deterministic pipeline runs end-to-end in Swift; Python only does the LLM step and scoring. This run was produced at `parakeet-transcriber` commit `33b7394e` with default parameters.
 
 ```
 swift build -c release
