@@ -1,26 +1,27 @@
 # Meeting Assistant Benchmark Results
 
-Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
+Pipeline: Gemini 3.1 Flash Lite (briefing, action items, live summary points) + Claude Sonnet (judge)
 
-Run date: 2026-04-18 (96-scenario suite) | 2026-04-22 (timezone subset, +7) | 103 scenarios total | 3–5 runs each
+Run date: 2026-07-14 (discovery, forward-looking, execution, action-items subsets — 92 scenarios, 3 runs each) | earlier sections keep their dated numbers inline
 
-> **Partial re-measurement — 2026-04-18.** Discovery (22 scenarios) and execution (28 scenarios) were re-run at the current production config (temp 1.0, thinking=minimal) after a prompt-validation session where we A/B-tested three candidate prompt additions. Two candidates regressed quality and were dropped; one (softened `<PREVIOUS_BRIEFING>` instruction for the briefing call) was kept for its latency wins. Other categories (hallucination, interpersonal, action items, question detection, long meetings, template compliance) still reflect the 2026-04-12 numbers.
+> **Re-measurement — 2026-07-14.** The four largest subsets were re-run after two production changes: the entire pipeline moved from Gemini 3 Flash (a retired preview model) to Gemini 3.1 Flash Lite, and the long-meeting running summary was replaced by the assistant's live summary points (see "The running summary" below). Two honest headlines: average briefing latency roughly **halved** (~1.5s → ~0.85s), and composite scores are **5–7 points lower** than the Flash-3-era numbers — the cost of running on a smaller, faster, cheaper model. The suites also grew between runs (26 vs 22 discovery scenarios; the action-items suite expanded from 13 to 35 scenarios, adding harder list-persistence cases), so the deltas are not a pure model A/B. Sections not re-run keep their dated numbers.
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Discovery composite (22 scenarios × 5 runs, 2026-04-18) | **96%** |
-| Execution composite (28 scenarios × 5 runs, 2026-04-18) | **97%** |
+| Discovery composite (26 scenarios × 3 runs, 2026-07-14) | **90%** (was 96% on Gemini 3 Flash, 22 scenarios) |
+| Execution composite (28 scenarios × 3 runs, 2026-07-14) | **91%** (was 97% on Gemini 3 Flash) |
+| Action-items composite (35 scenarios × 3 runs, 2026-07-14) | **90%** (suite expanded from 13 scenarios) |
+| Forward-looking composite (3 scenarios × 3 runs, 2026-07-14) | 87% |
 | Hallucination tag composite (2026-04-12, 5 runs) | 97% |
 | Long-meetings tag composite (2026-04-12, 5 runs) | 96% |
-| Avg latency — discovery | **1,513ms** (was 1,666ms on 2026-04-17, 1,802ms on 2026-04-09) |
-| Avg latency — execution | **1,520ms** (was 1,619ms on 2026-04-17, 1,802ms on 2026-04-09) |
-| p95 latency — discovery / execution | 1,844ms / 1,984ms |
-| p99 latency — discovery / execution | **1,998ms / 2,247ms** (was 2,728ms / 2,515ms on 2026-04-17) |
-| Stability (cross-run consistency) | 82% avg |
+| Avg latency — discovery / execution | **894ms / 844ms** (was 1,513ms / 1,520ms on Gemini 3 Flash) |
+| p95 latency — discovery / execution | 1,131ms / 1,086ms |
+| p99 latency — discovery / execution | 1,617ms / 1,498ms |
+| Stability (cross-run consistency) | 78–85% avg by subset |
 
-Partial re-measurement covers the two largest subsets (50 of 96 scenarios). Latency improved substantially after softening the `<PREVIOUS_BRIEFING>` instruction to a shorter anti-flicker + recency-focused form — p99 dropped ~730ms on discovery and ~268ms on execution vs the stricter instruction from 2026-04-17. Stability is lower at production temperature (1.0) than the previously-hardcoded benchmark temperature (0.3) — an intentional tradeoff for useful talking-point variation on refresh.
+The model migration trade, in plain terms: MimicScribe's prompts are tuned to run on a flash-class model — that's what makes the latency, the cost, and the bring-your-own-endpoint story work. When the Gemini 3 Flash preview was retired, the pipeline consolidated on Gemini 3.1 Flash Lite rather than moving up to a larger model. Briefings now land in under a second on average, and the composite scores above are what that trade measures out to. We publish the lower numbers rather than leaving the retired model's numbers up.
 
 ## Prompt validation — what we tried and what stuck
 
@@ -78,9 +79,11 @@ The named entity (`Snowflake`) is from prepared context as intended, but the fra
 
 ## Discovery Quality
 
-**22 scenarios** | **102/113 assertions** | **96% avg composite** | **1,666ms avg latency**
+**26 scenarios** | **139/164 assertions** | **90% avg composite** | **894ms avg latency** _(re-measured 2026-07-14 on Gemini 3.1 Flash Lite)_
 
 Tests whether the assistant helps users understand the other party's situation — root causes, ideal outcomes, impact quantification, and unexplored requirements — rather than jumping to solutions or surface-level suggestions.
+
+_The per-scenario-type tables below are from the 2026-04-18 Gemini 3 Flash run and are kept for detail until the next full breakdown._
 
 | Scenario Type | Count | Score | Avg Latency |
 |---------------|-------|-------|-------------|
@@ -145,9 +148,11 @@ Actual model outputs from discovery scenarios (unedited):
 
 ## Execution Quality (Goal & Commitment Tracking)
 
-**28 scenarios** | **143/157 assertions** | **97% avg composite** | **1,619ms avg latency**
+**28 scenarios** | **151/185 assertions** | **91% avg composite** | **844ms avg latency** _(re-measured 2026-07-14 on Gemini 3.1 Flash Lite)_
 
 Tests whether the assistant tracks stated goals, surfaces unaddressed items at wrap-up, and drives toward commitments in late-stage meetings.
+
+_The per-scenario-type tables below are from the 2026-04-18 Gemini 3 Flash run and are kept for detail until the next full breakdown._
 
 | Scenario Type | Count | Score | Avg Latency |
 |---------------|-------|-------|-------------|
@@ -255,28 +260,13 @@ _(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 ## Action Items
 
-**4 scenarios** | **13/14 assertions** | **99% avg composite**
+**35 scenarios** | **81/95 assertions** | **90% avg composite** | **814ms avg latency** _(re-measured 2026-07-14 on Gemini 3.1 Flash Lite)_
 
-_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
+The action-items suite nearly tripled since the last published run (13 → 35 scenarios). Beyond extraction — explicit commitments, due-date resolution, rejecting brainstorming and casual check-ins that contain no commitments — it now covers **list persistence across refreshes**: items on screen stay on screen unless explicitly closed, a reworded commitment updates the existing item in place instead of duplicating it, and completing one task must never close an unrelated one. It also covers media exclusion in both directions (no action items extracted from a video or podcast playing during the meeting, and real commitments still extracted while media plays).
 
-| Scenario Type | Count | Score | Avg Latency |
-|---------------|-------|-------|-------------|
-| Explicit commitments with due dates | 1 | 89% | 1653ms |
-| Brainstorming rejection (no phantom items) | 1 | 100% | 1425ms |
-| Mixed commitments and vague plans | 1 | 100% | 1580ms |
-| No commitments (casual check-in) | 1 | 100% | 1330ms |
+Across the run: 236 action items extracted over 105 runs, 195 with resolved due dates.
 
-**Failures:**
-
-- [67%] [critical] Due date grounding — one date resolved to the wrong day in 1/3 runs
-
-## Incremental Action Items
-
-**9 scenarios** | **23/27 assertions** | **94% avg composite**
-
-_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
-
-Previous items preserved when transcript is unrelated, deadlines updated without duplication, cancelled items removed, aged-out items retained when supported by compacted summary.
+**Known weakness:** on ambiguous present-intent phrasing ("I'm working on X now"), the model occasionally closes an item early when the surrounding discussion pivots. Because the list is persistent and re-evaluated each refresh, these recover on the next pass rather than vanishing.
 
 ## Timezone Resolution
 
@@ -313,7 +303,7 @@ _(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 ### Date preservation — "two weeks" stays "two weeks"
 
-A concrete improvement: when the compacted summary contains commitments like *"Martin can have the CAC dashboard ready in two weeks"*, the briefing model now preserves the relative phrasing rather than converting to an absolute date.
+A concrete improvement: when the meeting-so-far summary contains commitments like *"Martin can have the CAC dashboard ready in two weeks"*, the briefing model now preserves the relative phrasing rather than converting to an absolute date.
 
 **Earlier behavior:**
 > *"Martin to deliver manual CAC dashboard by **April 23**"*
@@ -327,29 +317,29 @@ Calendar resolution is handled separately by the action-items extraction model, 
 
 **Remaining weakness:** 2 real hallucinations in 35 runs, both in the enterprise-deal scenario where action-item due dates were occasionally still computed as absolute dates (a pre-existing issue in the action-items extraction, not the briefing summary).
 
-### Compaction — the running summary that powers long-meeting briefings
+### The running summary — live summary points (updated 2026-07-14)
 
-Meetings past 15 minutes trigger a background compaction step that rolls older transcript (anything beyond the last 10 minutes) into a running summary. Over a 90-minute meeting this produces 12-19 compaction cycles, each inheriting the previous summary and merging in new content. The summary is then re-injected on every briefing call as `<MEETING_SUMMARY_SO_FAR>`, letting the briefing model reason about the whole meeting without seeing the full transcript.
+The background compaction step described in earlier versions of this page has been **removed**. Long-meeting briefings are now grounded in the assistant's **live summary points** — the short, self-contained notes the assistant already produces on screen during the meeting. The accumulated points are passed into each briefing call as the meeting-so-far summary, replacing the separate summarization pass entirely (one fewer recurring LLM call per meeting, and the briefing reasons over the same notes the user is reading).
 
-Tested on 3 synthesized 80-minute marathon transcripts with 10-24 specific source numbers each:
+Measured on the same three synthesized 80-minute marathon transcripts and the same judge used for the previous compaction numbers:
 
-| Metric | Baseline (3K cap, pre-redesign) | Current (12K cap, redesigned prompt) |
+| Metric | Compaction (previous) | **Live summary points** |
 |--------|:-:|:-:|
-| Number coverage (avg across 3 scenarios) | 40% | **83%** |
-| Noun coverage (avg) | 60% | **72%** |
-| Judge-flagged missing facts (total) | 35 | **13** |
-| Relative date preservation | Mutates 4/5 runs | **5/5 runs preserve** |
+| Number coverage (avg across 3 scenarios) | 83% | **92% / 96%** (two runs) |
+| Noun coverage (avg) | 72% | **74%** |
 
-**Compaction also improves downstream briefing quality** — perhaps counterintuitively, the briefing model produces better talking points from a compacted summary than from the full transcript (12 briefing samples per condition):
+Points also handle reversals: when a decision changes mid-meeting, the stale point is retracted from the live view rather than left contradicting the new one — and the retracted point is kept (marked as superseded) so the post-meeting summary still knows the full history.
 
-| Briefing metric | Full transcript in | **Compacted summary + recent window** |
-|--------|:-:|:-:|
-| Resurfacing avoidance | 33% | **50%** |
-| No-hallucination pass rate | 83% | **100%** |
-| Briefing latency | 3,071ms | **2,245ms (-27%)** |
-| Input tokens | 11,726 | **4,996 (-57%)** |
+### Post-meeting summary coverage on long meetings (new — 2026-07-14)
 
-The focused summary separates "settled" from "recent" content clearly. Full-transcript input overwhelms the model's forward-looking discipline and causes it to pull from anywhere in the meeting — including settled action items.
+Long-meeting summaries have traditionally had a **dwell-time bias**: topics discussed at length dominate, and something mentioned once and never revisited tends to silently vanish. Measured on a field-derived 77-minute advice call with 19 hand-labeled key points, the baseline summary covered **44%** of them. A structural coverage check added this cycle corrects for the bias — briefly-mentioned substance is caught and included rather than depending on model behavior alone:
+
+| Configuration | Key-point coverage |
+|---------------|:-:|
+| Before (single-call summary) | 44% |
+| With the coverage check | **~72%** (3 runs: 58–84%) |
+
+Honest caveats: this is a single long-meeting case — the one that surfaced the problem in the field — not a corpus, and run-to-run variance is real (the range above). Closing the remaining gap is open work.
 
 ## Refresh Continuity (New — 2026-04-17)
 
@@ -389,7 +379,7 @@ The most persistent failure mode across iterations: the briefing model occasiona
 > *- Confirm the meeting is adjourned.*
 > *- Suggest a final review of the sprint board.*
 
-All three bullets restate things the transcript just accomplished. The model defaults to "meeting-closing activities" as a safe output pattern even when those activities are visibly complete. This accounts for the 50% resurfacing rate observed in the compacted-briefing tests above.
+All three bullets restate things the transcript just accomplished. The model defaults to "meeting-closing activities" as a safe output pattern even when those activities are visibly complete. This remains the dominant failure class in the 2026-07-14 re-measurement as well — most of the dropped assertion points in the discovery and action-items subsets trace to talking points that restate commitments already made instead of proposing a net-new angle.
 
 **Where the model does well on specificity** — same scenario, different run, decisions still open:
 > *- Ask how Alex's RFC should structure the caching invalidation strategy.*
@@ -400,8 +390,8 @@ Each bullet names specific people and topics from the source while adding a conc
 
 ## Methodology
 
-- **96 scenarios**, 5 runs each (480 total briefing API calls for a full suite)
-- **Production config**: Gemini 3 Flash at temperature 1.0, thinking=minimal for briefing; Gemini 3.1 Flash Lite at temperature 0.2, thinking=minimal for action items.
+- The suite has grown to 130+ scenarios across all subsets. The 2026-07-14 re-measurement covered the 92 scenarios in the four largest subsets (discovery, forward-looking, execution, action items) at 3 runs each; smaller subsets keep their dated numbers.
+- **Production config**: Gemini 3.1 Flash Lite, temperature 1.0 with minimal thinking for briefing; temperature 0.2 for action items. (Earlier published runs used the since-retired Gemini 3 Flash preview for briefing.)
 - **Deterministic assertions**: string matching, bullet counts, template structure, annotation leakage detection
 - **LLM judge**: Claude Sonnet evaluates semantic quality (hallucination, grounding, forward-looking, discovery depth, interview depth, blocker ownership, workaround detection, presentation coverage, requirements surfacing)
 - **Composite scoring**: Critical assertions weighted 3x, Major 2x, Minor 1x
