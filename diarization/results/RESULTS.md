@@ -2,17 +2,19 @@
 
 Pipeline: Parakeet TDT 0.6B ASR + Pyannote Community-1 diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
 
-Run date: 2026-06-11
+Run date: 2026-07-17
 
 ## What's new in this update
 
-**Aggregate SAA 97.4% → 97.9%, aggregate confusion 2.6% → 2.1%** on the public corpus. Two new post-clustering stages carry most of the gain since the 2026-05-15 publication; the rest comes from refinement of existing stages.
+**Aggregate SAA 97.9% → 98.2% on the same 52 files as the previous publication, and the corpus grows to 57 files with the addition of DiPCo** (dinner-party conversations). On the expanded 57-file corpus the aggregate is 98.1%. Confusion dropped on every corpus.
 
-The first targets a failure where a meeting grows a phantom extra speaker: short interjections — "yeah," "right," "okay" — from several real participants can collect into a cluster of their own. A new stage recognizes that profile and re-routes each interjection to the speaker it belongs to. Largest gain on AMI (+0.5 pp), where back-and-forth meeting chatter makes this failure most common.
+Most of the gain comes from work on phantom extra speakers — clusters the diarizer creates that don't correspond to any real participant. Two failure shapes were addressed since the last publication.
 
-The second targets the opposite failure: a quieter participant who never gets a cluster at all, because their voice partially resembles several louder ones — common for analysts dialing into earnings calls over telephone-quality lines, whose questions then ride along inside an executive's answer. A new recovery stage notices a sustained stretch of speech that doesn't fit any existing speaker well and gives it a speaker of its own. Largest gain on Earnings-21 (+0.8 pp), where several previously-missing analysts are now attributed.
+The first is the *turn-opening* phantom. The first words of a speaking turn sound measurably different from the same speaker's steady voice — the effect is strongest through Bluetooth headsets, whose audio processing ramps in over the first moments of speech. Those opening slivers can collect into a phantom speaker of their own, so a meeting shows an extra participant who only ever says the first few words of someone else's turns. A new stage recognizes a cluster made almost entirely of turn openings and routes each opener to the speaker who actually continued the turn. Related handling covers switching input devices mid-meeting (connecting or disconnecting a headset): the brief settling period after a switch no longer feeds speaker identity.
 
-Both stages follow the pipeline's standing bias: when uncertain, prefer an extra speaker over a merged one — merging two speakers in the UI is one click, splitting them apart is per-segment work.
+The second is a refinement of the existing interjection-cluster dissolution: a grab-bag cluster of one-word acknowledgments from several participants is now recognized even when a single longer aside sits among them and previously disguised the cluster as a real speaker.
+
+Alongside these, a brief fragment that can't be confidently placed with any speaker now parks in a hidden "Unknown" bucket instead of being forced into the nearest cluster — a wrong attribution is harder to notice and undo than a missing one. This follows the pipeline's standing bias: when uncertain, prefer a recoverable error over an invisible one.
 
 ## Speaker Attribution Accuracy (SAA)
 
@@ -20,13 +22,14 @@ Both stages follow the pipeline's standing bias: when uncertain, prefer an extra
 
 | Corpus | Files | Pyannote C1 SAA | MimicScribe SAA | Speedup |
 |--------|------:|----------------:|----------------:|--------:|
-| Earnings-21 | 11 | 98.1% | **97.7%** | 3.7x |
-| VoxConverse | 20 | 95.9% | **96.4%** | 4.1x |
-| SCOTUS | 5 | 99.2% | **98.9%** | 5.4x |
-| AMI | 16 | 97.0% | **97.6%** | 3.7x |
-| **Aggregate** | **52** | — | **97.9%** | — |
+| Earnings-21 | 11 | 98.1% | **98.0%** | 3.7x |
+| VoxConverse | 20 | 95.9% | **97.2%** | 4.1x |
+| SCOTUS | 5 | 99.2% | **99.0%** | 5.4x |
+| AMI | 16 | 97.0% | **97.8%** | 3.7x |
+| DiPCo | 5 | — | **97.4%** | — |
+| **Aggregate** | **57** | — | **98.1%** | — |
 
-Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters.
+On the previous publication's 52-file basis (DiPCo excluded), the aggregate is **98.2%** — up from 97.9%. Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters; the reference has not yet been run on DiPCo.
 
 Over-segmentation is preferred over under-segmentation. Merging two speakers in the UI is a single correction; splitting one speaker requires manual per-segment reassignment.
 
@@ -81,17 +84,18 @@ The DER number on this benchmark mixes three components, only one of which measu
 - **Missed speech** — speech the system didn't emit at all. Driven by ASR coverage, not diarization.
 - **False alarm** — hyp-tagged speech that ref marks as silence. Driven by UX choices about how segments are drawn.
 
-**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 2.6% → **2.1%** (−0.5 pp). Earnings-21: 3.1% → 2.3%. AMI: 2.9% → 2.4%. VoxConverse: 3.8% → 3.6%. SCOTUS: 1.3% → 1.1%.
+**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 2.1% → **1.9%** (1.8% on the previous publication's 52-file basis). Earnings-21: 2.3% → 2.0%. AMI: 2.4% → 2.2%. VoxConverse: 3.6% → 2.8%. SCOTUS: 1.1% → 1.0%. The aggregate missed-speech component rises with this update because the newly added DiPCo — overlapping dinner-table conversation — carries 25.9% missed speech; that is ASR coverage on hard audio, not attribution error.
 
 The pipeline collapses consecutive same-speaker word runs into a single segment, even when the speaker paused mid-thought — a 4-second pause shouldn't fragment one person's quote into two transcript lines; the LLM step inserts paragraph breaks when topical structure calls for them. From pyannote's perspective, every merged-over silence between two parts of the same speaker's turn costs false-alarm frames. An ASR that drops mumbled or overlapped speech can score lower on these aggregate components than one that captures it, because missed speech can't be confused.
 
 | Corpus | DER | Confusion | False Alarm | Missed |
 |--------|----:|----------:|------------:|-------:|
-| Earnings-21 | 16.3% | 2.3% | 13.5% | 0.5% |
-| VoxConverse | 18.8% | 3.6% | 9.5% | 5.7% |
-| SCOTUS | 3.6% | 1.1% | 0.0% | 2.5% |
-| AMI | 31.1% | 2.4% | 12.4% | 16.2% |
-| **Aggregate** | **17.2%** | **2.1%** | **8.8%** | **6.3%** |
+| Earnings-21 | 16.2% | 2.0% | 13.5% | 0.7% |
+| VoxConverse | 15.8% | 2.8% | 7.5% | 5.5% |
+| SCOTUS | 3.4% | 1.0% | 0.0% | 2.4% |
+| AMI | 28.2% | 2.2% | 9.7% | 16.3% |
+| DiPCo | 31.0% | 2.6% | 2.4% | 25.9% |
+| **Aggregate** | **17.4%** | **1.9%** | **7.4%** | **8.2%** |
 
 ## Benchmark vs Production
 
@@ -109,6 +113,7 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 | [VoxConverse](https://github.com/joonson/voxconverse) | YouTube debates/interviews | 20 | ~2 hrs | 2–6 |
 | [SCOTUS](https://www.oyez.org) | Supreme Court oral arguments | 5 | ~7.5 hrs | 10–12 |
 | [AMI](https://groups.inf.ed.ac.uk/ami/corpus/) | Meeting recordings (IHM-mix) | 16 | ~9 hrs | 4 |
+| [DiPCo](https://arxiv.org/abs/1909.13447) | Dinner-party conversations | 5 | ~2.5 hrs | 4 |
 
 ## Methodology
 
@@ -119,12 +124,12 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 
 ## Reproducibility
 
-The deterministic pipeline runs end-to-end in Swift; Python only does the LLM step and scoring. This run was produced at `parakeet-transcriber` commit `33b7394e` with default parameters.
+The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). This run was produced at `parakeet-transcriber` commit `d4a99c61` with default parameters.
 
 ```
 swift build -c release
 .build/release/mimicscribe --benchmark-pipeline-corpus
-benchmark/.venv313/bin/python3 scripts/run_corpus_eval.py
+PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 -m mimicscribe_bench.runner
 ```
 
-The first command runs the deterministic pipeline on the 52-file corpus and writes per-file post-clustering segments plus per-stage timings. The second runs the LLM attribution and scores against the ground-truth RTTMs. Both halves persist progress per file. Audio source paths and ground-truth RTTMs come from the public corpora linked above.
+The first command runs the deterministic pipeline on the 57-file corpus and writes per-file post-clustering segments plus per-stage timings. The second scores them against the ground-truth RTTMs (pyannote.metrics, optimal mapping, 0.25s collar). Both halves persist progress per file. Audio source paths and ground-truth RTTMs come from the public corpora linked above.
