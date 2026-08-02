@@ -1,0 +1,125 @@
+# MimicScribe Speaker Identity Benchmark Results
+
+How reliably does the app recognize a *returning* speaker — someone with a saved
+voice profile — in a new meeting? This is a different question from diarization
+(who spoke when, within one meeting), and it is scored separately.
+
+Run date: 2026-08-01
+
+## What is measured
+
+Standard speaker-recognition benchmarks score *verification*: one voice sample,
+one claimed identity, yes or no. That shape misses the failure that actually
+matters in a meeting app. MimicScribe answers an *identification* question: a
+speaker appears in a meeting, and the app must decide which of the user's saved
+profiles — if any — this voice belongs to, against the whole profile library at
+once.
+
+Each trial has one of three outcomes:
+
+- **Correct**: the speaker is matched to their own profile.
+- **Wrong**: the speaker is matched to someone else's profile. This is the
+  expensive error — it writes a false name into a durable transcript and folds
+  the wrong voice into a saved profile, making the *next* error more likely.
+- **Refused**: the app declines to pick. This costs one manual rename.
+
+The two error families are never averaged into a single score, because they are
+not the same price. The design goal is that when the app is unsure, it refuses
+rather than guesses.
+
+## Headline numbers
+
+AMI meeting corpus (CC BY 4.0), recurring speakers across sessions, profiles
+built by the exact production code path (never a more permissive shortcut), 30
+seconds of enrollment speech, full-meeting recognition:
+
+| Metric | Value |
+|---|---|
+| Correct identification | **92.0%** (779 genuine trials) |
+| Wrong identification | **0** (95% upper bound 0.5%) |
+| Below-bar suggestion tier precision | 90% (95% CI 79–96%) |
+| Speech required to create a profile | **30 seconds** (a hard floor: below it, the app refuses to enroll) |
+| First suggestion for an already-enrolled speaker | within the first **~5 seconds** of heard speech (reaches 36.5% of returning speakers at 91.9% precision) |
+
+The last two rows are the timing context the accuracy rows need: they say how
+long it takes to get *into* the system. Creating a profile requires 30 seconds
+of qualifying speech; below that the app refuses to enroll rather than build a
+profile from too little evidence — truncated enrollments measured drastically
+less reliable, so the floor is deliberate, and every budget that clears it
+measured zero wrong identifications. Recognizing a returning speaker starts
+much sooner than that: within the first ~5 seconds they are heard in a new
+meeting, the one-click suggestion tier already reaches about a third of
+returning speakers at ~92% precision, while automatic naming deliberately
+waits for more evidence before committing a name on its own.
+
+The refusals that make up the remaining ~8% are dominated by short speech:
+recognition-time speech, not enrollment speech, is the binding constraint.
+Coverage roughly doubles between the first ~20 seconds a speaker is heard and
+the full meeting. Forced early snapshots are also where the rare wrong
+identification lives — under 0.6% when a decision is forced at 10–20 seconds
+of heard speech — which is why the app accumulates evidence rather than
+committing on first hearing; at full-meeting evidence, wrong identifications
+measured zero. Below the automatic-match bar, the app shows a one-click "Is
+this X?" suggestion instead of deciding on its own; those suggestions are
+right 90% of the time.
+
+## What keeps profiles accurate
+
+A saved profile is only as good as the voice data that builds it, and a
+matching rule is only as safe as its worst case. Several measured safeguards
+work together:
+
+- **Enrollment is gated.** Speech only enters a profile after clearing quality
+  and quantity floors; low-evidence fragments are excluded rather than
+  averaged in.
+- **A profile can hold more than one voiceprint.** The same person sounds
+  different through AirPods than through a laptop microphone, and different
+  again early in their enrollment history. Profiles hold separate voiceprints
+  for genuinely distinct conditions — keyed by the actual input device on the
+  microphone side — rather than blurring them into one average.
+- **Every voiceprint must clear its own evidence-based confidence bar before
+  it can claim a match.** A voiceprint that sits acoustically close to
+  someone else's profile has to be *more* confident than one that stands
+  alone. This is what makes multiple voiceprints safe: in our measurements it
+  removed every same-room false accept that a naive best-match rule produced
+  (5 of 1,401 stranger trials → 0), at no cost in correct identifications.
+- **Close calls are refused, and visibly.** When two profiles score within an
+  ambiguity margin of each other, the app refuses the match and surfaces the
+  conflict instead of silently picking one.
+- **The alternatives were measured, not assumed.** Every mechanism above
+  shipped only after beating its alternatives on this benchmark; intuitive
+  alternatives that measured no better — or actively worse — than the simpler
+  approach are not in the app.
+
+## Honest caveats
+
+- AMI headset and room-microphone conditions are acoustically closer to each
+  other than a user's real device switches (AirPods vs. built-in mic), so the
+  multi-voiceprint gains measured here are conservative for the device case
+  the feature targets.
+- During the label audit we found one AMI session pair whose reference
+  speaker labels are rotated relative to the audio; it is excluded from the
+  substrate, and the audit method is applied to every corpus before its
+  numbers are published.
+- The zero in the wrong-identification row is a measured zero with a finite
+  denominator, not a guarantee; its 95% upper bound is stated alongside it.
+- Enrollment and probe speech are drawn from talkative meeting participants
+  (AMI's minimum is ~26 s per session), which is mildly optimistic for a
+  genuinely quiet participant.
+
+## Methodology
+
+Voice embeddings come from the same on-device pipeline the app ships
+(FluidAudio speaker embeddings); profile construction, matching, and refusal
+logic run the production decision rules. Genuine trials hold out each
+recurring speaker's newest session for recognition and enroll from the rest,
+so no recognition audio ever contributes to the profile it is scored against.
+False-accept trials probe every profile with speakers who co-occurred in the
+same rooms — the hardest impostor population — plus cross-corpus strangers.
+
+## Reproducibility
+
+Produced at `parakeet-transcriber` commit `9df400c9` with production default
+parameters on the cached AMI embedding substrate. The enrollment-floor and
+suggestion-timing rows were produced at commit `8efacf56` on the same
+substrate, also with production default parameters.
