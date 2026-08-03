@@ -67,6 +67,22 @@ measured zero. Below the automatic-match bar, the app shows a one-click "Is
 this X?" suggestion instead of deciding on its own; those suggestions are
 right 90% of the time.
 
+## A second corpus
+
+The numbers above are measured on AMI. To check that the operating point is
+not tuned to one corpus's acoustics, the same production decision rules run
+on an independent second corpus (ICSI meeting corpus), with the same
+reference-label audit applied first — it excluded eleven ICSI sessions with
+suspect labels, the same defect class the audit caught and excluded in AMI.
+Under a one-probe-per-returning-speaker protocol, AMI measures 99.4% correct
+(170 trials) and ICSI measures 89.5% (38 trials, a thin sample with wide
+bounds) — zero wrong identifications on both, with the entire gap being
+additional refusals, never wrong names. ICSI also enables a larger same-room
+impostor test than AMI supports (410 trials of people probing their actual
+room-mates' profiles): one wrong match appeared (0.2%). That is the honest
+number at higher statistical power, and ICSI now runs as a standing
+validation corpus alongside AMI.
+
 ## What keeps profiles accurate
 
 A saved profile is only as good as the voice data that builds it, and a
@@ -127,4 +143,5 @@ Produced at `parakeet-transcriber` commit `9df400c9` with production default
 parameters on the cached AMI embedding substrate. The enrollment-floor and
 suggestion-timing rows were produced at commit `8efacf56` on the same
 substrate, also with production default parameters; the enrollment-floor
-recalibration (30 → 20 seconds) was produced at commit `afc0a31f`.
+recalibration (30 → 20 seconds) was produced at commit `afc0a31f`, and the
+second-corpus (ICSI) validation at commit `126c0a05`.
