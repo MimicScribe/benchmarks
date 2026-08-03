@@ -38,15 +38,19 @@ seconds of enrollment speech, full-meeting recognition:
 | Correct identification | **92.0%** (779 genuine trials) |
 | Wrong identification | **0** (95% upper bound 0.5%) |
 | Below-bar suggestion tier precision | 90% (95% CI 79–96%) |
-| Speech required to create a profile | **30 seconds** (a hard floor: below it, the app refuses to enroll) |
+| Speech required to create a profile | **20 seconds** across a few turns (a hard floor: below it, the app refuses to enroll) |
 | First suggestion for an already-enrolled speaker | within the first **~5 seconds** of heard speech (reaches 36.5% of returning speakers at 91.9% precision) |
 
 The last two rows are the timing context the accuracy rows need: they say how
-long it takes to get *into* the system. Creating a profile requires 30 seconds
-of qualifying speech; below that the app refuses to enroll rather than build a
-profile from too little evidence — truncated enrollments measured drastically
-less reliable, so the floor is deliberate, and every budget that clears it
-measured zero wrong identifications. Recognizing a returning speaker starts
+long it takes to get *into* the system. Creating a profile requires 20 seconds
+of qualifying speech spread across a few separate turns (a single continuous
+monologue needs more); below that the app refuses to enroll rather than build
+a profile from too little evidence. The floor was originally 30 seconds and
+was lowered only after a dedicated recalibration: 2,808 profiles that the old
+floor refused were admitted on this corpus with zero wrong identifications and
+zero impostor false-accepts, and the floors that did not pass that bar were
+left unchanged. Every budget that clears the floor measured zero wrong
+identifications. Recognizing a returning speaker starts
 much sooner than that: within the first ~5 seconds they are heard in a new
 meeting, the one-click suggestion tier already reaches about a third of
 returning speakers at ~92% precision, while automatic naming deliberately
@@ -122,4 +126,5 @@ same rooms — the hardest impostor population — plus cross-corpus strangers.
 Produced at `parakeet-transcriber` commit `9df400c9` with production default
 parameters on the cached AMI embedding substrate. The enrollment-floor and
 suggestion-timing rows were produced at commit `8efacf56` on the same
-substrate, also with production default parameters.
+substrate, also with production default parameters; the enrollment-floor
+recalibration (30 → 20 seconds) was produced at commit `afc0a31f`.
