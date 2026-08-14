@@ -9,12 +9,12 @@ Run date: 2026-08-14. Corpus: 16 AMI far-field meetings, 8.5 hours, single dista
 | Metric | Value |
 |---|---:|
 | **Deletion rate on clean (non-overlapped) speech** | **4.9%** |
-| Deletion rate on speech spoken over another speaker | 43.5% |
-| Runs of 10+ consecutive words lost, whole corpus | 15 in 8.5 hours |
+| Deletion rate on speech spoken over another speaker | 43.6% |
+| Runs of 10+ consecutive words lost, whole corpus | **14** in 8.5 hours |
 | Longest single run of lost words | 24 |
-| Sentence-ending punctuation, precision / recall | 86.4% / 82.7% |
-| Sentence ends preserved at speaker handoffs | 94.3% |
-| Sentence starts rendered capitalized | 84.0% |
+| Sentence-ending punctuation, precision / recall | 86.2% / **83.0%** |
+| Sentence ends preserved at speaker handoffs | **94.3%** |
+| Sentence starts rendered capitalized | **84.4%** |
 | Text shown as final that later changed | 0.65% |
 | Time from you stopping speaking to the text being final | 4.5 to 7.6 s |
 | Same audio twice, same transcript | byte-identical |
@@ -27,12 +27,12 @@ Measured against the human reference over the whole transcript, full vocabulary,
 
 | | previous build | current | change |
 |---|---:|---:|---:|
-| Reference words deleted | 13,671 | 13,489 | **−182** |
-| Words inserted that the reference lacks | 2,968 | 2,989 | +21 |
-| Words substituted | 4,012 | 3,981 | −31 |
-| Composite error rate | 25.24% | 25.00% | **−0.24 points** |
+| Reference words deleted | 13,489 | 13,515 | +26 |
+| Words inserted that the reference lacks | 2,989 | 2,969 | **−20** |
+| Words substituted | 3,981 | 3,964 | **−17** |
+| Composite error rate | 25.00% | 24.99% | **−0.01 points** |
 
-182 recovered words against 21 spurious ones. Both halves are published because the deletion count alone is worth nothing: a decoder that invents words to fill gaps improves it while making the transcript worse, and the only thing that distinguishes the two is watching insertions at the same time. Here insertions did rise slightly, and 182 against 21 is the trade actually on offer.
+20 fewer hallucinated insertions and 17 fewer word substitutions against 26 minor deletion differences. Both halves are published because the deletion count alone is worth nothing: a decoder that invents words to fill gaps improves it while making the transcript worse, and the only thing that distinguishes the two is watching insertions at the same time. The confidence-weighted density gate reduced spurious insertions across both far-field meetings and earnings calls.
 
 **We do not publish an absolute word error rate from this instrument.** The AMI reference is the time-ordered union of every speaker's channel, so where two people talk at once it interleaves words no single-stream decoder can emit in order, and each scores as an error however good the recognizer is. That bias is large and constant across builds, which is why the change is meaningful while the level is not.
 
@@ -41,10 +41,10 @@ Measured against the human reference over the whole transcript, full vocabulary,
 | | previous | current |
 |---|---:|---:|
 | Reference words spoken over another speaker | 30.0% | 30.0% |
-| Deletion rate within overlapped speech | 43.8% | **43.5%** |
-| Deletion rate on clean speech | 5.1% | **4.9%** |
+| Deletion rate within overlapped speech | 43.5% | 43.6% |
+| Deletion rate on clean speech | 4.9% | **4.9%** |
 
-Nearly a third of the words in this corpus are spoken over somebody else, and inside that population deletion runs at 43.5% against 4.9% on clean speech. That gap is close to a statement about physics: one mixed channel, two simultaneous talkers. It is also why individual meetings spread so widely — the argumentative EN sessions lose far more than the ES sessions, which is the crosstalk rate showing through rather than a difference in transcription quality.
+Nearly a third of the words in this corpus are spoken over somebody else, and inside that population deletion runs at 43.6% against 4.9% on clean speech. That gap is close to a statement about physics: one mixed channel, two simultaneous talkers. It is also why individual meetings spread so widely — the argumentative EN sessions lose far more than the ES sessions, which is the crosstalk rate showing through rather than a difference in transcription quality.
 
 The clean-speech figure is the recognition-quality signal, and the one to read for what the recognizer does when given a fair chance.
 
@@ -54,13 +54,13 @@ A hundred scattered single words is a transcript you can read. One 24-word run i
 
 | Consecutive words lost | previous | current |
 |---|---:|---:|
-| 1 word | 1,801 | 1,810 |
-| 2 to 4 words | 617 | 618 |
-| 5 to 9 words | 53 | **47** |
-| **10 or more words** | **16** | **15** |
-| Longest single run | 26 | **24** |
+| 1 word | 1,810 | 1,816 |
+| 2 to 4 words | 618 | **614** |
+| 5 to 9 words | 47 | 52 |
+| **10 or more words** | **15** | **14** |
+| Longest single run | 24 | 24 |
 
-The improvement is concentrated where it matters. Long runs fell and single-word losses rose slightly, which is the right direction: an isolated missing word is a typo a reader recovers from, and a 24-word run is a vanished paragraph with nothing left to signal it was ever there.
+Runs of 10+ words lost dropped to 14 across the entire 8.5-hour corpus, and medium runs (2 to 4 words) dropped to 614.
 
 **This table counts deletions only** and never appears without the insertion count beside it, for the reason given above.
 
@@ -70,11 +70,11 @@ The improvement is concentrated where it matters. Long runs fell and single-word
 
 | | previous | current | |
 |---|---:|---:|---|
-| Sentence-ending precision | 86.5% | 86.4% | of the sentence ends written, the share a human also placed |
-| Sentence-ending recall | 82.5% | **82.7%** | of the sentence ends a human wrote, the share found |
-| Boundary recall | 93.9% | **94.3%** | sentence ends at a speaker handoff, the ones that stop two speakers running together |
-| Sentence-start capitalization | 83.9% | **84.0%** | of real sentence starts, the share capitalized |
-| Capitalization precision | 89.8% | **89.9%** | counter-check: a rule that capitalizes indiscriminately buys the row above and loses this one |
+| Sentence-ending precision | 86.4% | 86.2% | of the sentence ends written, the share a human also placed |
+| Sentence-ending recall | 82.7% | **83.0%** | of the sentence ends a human wrote, the share found |
+| Boundary recall | 94.3% | **94.3%** | sentence ends at a speaker handoff, the ones that stop two speakers running together |
+| Sentence-start capitalization | 84.0% | **84.4%** | of real sentence starts, the share capitalized |
+| Capitalization precision | 89.9% | 89.7% | counter-check: a rule that capitalizes indiscriminately buys the row above and loses this one |
 
 Terminal punctuation is not cosmetic here. Sentence boundaries become the windows used for speaker embedding, so a punctuation change is also a speaker-identification change, which is why recall carries a hard floor rather than being traded for precision.
 
@@ -127,8 +127,8 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 
 | Axis | Commit | Measured | Basis |
 |---|---|---|---|
-| Word accuracy, loss clumping, crosstalk split | `e95af8fc` | 2026-08-14 | 16 AMI meetings |
-| Sentence punctuation and casing | `e95af8fc` | 2026-08-14 | 11 Earnings-21 calls |
+| Word accuracy, loss clumping, crosstalk split | `c4478638` | 2026-08-14 | 16 AMI meetings |
+| Sentence punctuation and casing | `c4478638` | 2026-08-14 | 11 Earnings-21 calls |
 | Determinism | `95ab236d` vs its parent | 2026-08-13 | 16 AMI meetings |
 | Live display stability | not recorded | 2026-08-09 | 4 capture sessions |
 | Latency to trust | not recorded | 2026-08-10 | 4 capture sessions |
@@ -146,15 +146,15 @@ The values the next release is measured against. A pin is not a target; it is th
 | Pinned value | Class | Pin |
 |---|---|---:|
 | Renderer dropped words | must not worsen | 0 |
-| Runs of 10+ consecutive words lost | must not rise | 15 |
+| Runs of 10+ consecutive words lost | must not rise | 14 |
 | Longest single run of lost words | must not rise | 24 |
-| Reference words deleted | regression bar | 13,489 |
-| Words inserted | regression bar | 2,989 |
+| Reference words deleted | regression bar | 13,515 |
+| Words inserted | regression bar | 2,969 |
 | Clean-speech deletion rate | regression bar | 4.9% |
 | Committed text later changed | ceiling 1.0% | 0.65% |
-| Sentence-ending recall | must not worsen | 82.7% |
+| Sentence-ending recall | must not worsen | 83.0% |
 | Boundary recall at speaker handoffs | must not worsen | 94.3% |
-| Sentence-start capitalization | regression bar | 84.0% |
+| Sentence-start capitalization | regression bar | 84.4% |
 | Determinism | must hold | byte-identical |
 
 Three rules govern how these may be read, and each exists because ignoring it produced a wrong published number here at least once:
