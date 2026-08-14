@@ -1,119 +1,185 @@
 # MimicScribe Live Transcription Benchmark Results
 
-Pipeline: Parakeet TDT 0.6B ASR on CoreML, transcribing in real time from overlapping listening windows; a deterministic stitcher commits the final transcript.
+Pipeline: Parakeet TDT 0.6B ASR on CoreML, transcribing in real time from overlapping listening windows.
 
-Run date: 2026-07-10
+Run date: 2026-08-14. Corpus: 16 AMI far-field meetings, 8.5 hours, single distant microphone. Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display and latency come from 4 recorded capture sessions, a smaller basis, marked as such.
 
 ## Headline numbers
 
-<!-- MERGE_SEAM_HEADLINE:BEGIN -->
 | Metric | Value |
 |---|---:|
-| Stitch points checked | 736 |
-| Stitch points that lost 3+ meaningful words | **0** |
-| Stitch points that lost any meaningful word | 161 (149 lost one word, 12 lost two) |
-| Content words surviving across all stitch-point disagreements | 86.2% (1,081 of 1,254) |
-| Content-word recall vs. human reference transcript | 83.3% |
-| Sentence-ending punctuation, precision / recall | 79.7% / 82.2% |
-| Sentence ends preserved at speaker handoffs | 92.8% |
-<!-- MERGE_SEAM_HEADLINE:END -->
+| **Deletion rate on clean (non-overlapped) speech** | **4.9%** |
+| Deletion rate on speech spoken over another speaker | 43.5% |
+| Runs of 10+ consecutive words lost, whole corpus | 15 in 8.5 hours |
+| Longest single run of lost words | 24 |
+| Sentence-ending punctuation, precision / recall | 86.4% / 82.7% |
+| Sentence ends preserved at speaker handoffs | 94.3% |
+| Sentence starts rendered capitalized | 84.0% |
+| Text shown as final that later changed | 0.65% |
+| Time from you stopping speaking to the text being final | 4.5 to 7.6 s |
+| Same audio twice, same transcript | byte-identical |
 
-Stitch-point and recall numbers come from 8 meetings of the AMI corpus; punctuation from 11 Earnings-21 calls. Both corpora are described under [Corpora](#corpora).
+The first two rows are the pair to read together, and they are explained below.
 
-## What a stitch point is
+## Word accuracy
 
-The live engine decodes audio in overlapping windows, so every stretch of speech near a window boundary is transcribed twice, by two windows that each saw different surrounding context. Usually the two readings agree. When they don't, the stitcher has to commit one transcript — and the failure that matters is a word someone actually said disappearing at that moment, silently.
+Measured against the human reference over the whole transcript, full vocabulary, no filler stop-list. Reference: 81,826 words across the 16 meetings.
 
-We count every one of those disagreements. Across the 8 test meetings there were 736. At each one we take every meaningful word either reading contained (skipping fillers like "um" and "okay") and check it against the committed transcript.
+| | previous build | current | change |
+|---|---:|---:|---:|
+| Reference words deleted | 13,671 | 13,489 | **−182** |
+| Words inserted that the reference lacks | 2,968 | 2,989 | +21 |
+| Words substituted | 4,012 | 3,981 | −31 |
+| Composite error rate | 25.24% | 25.00% | **−0.24 points** |
 
-## Where words do get lost — every case, counted
+182 recovered words against 21 spurious ones. Both halves are published because the deletion count alone is worth nothing: a decoder that invents words to fill gaps improves it while making the transcript worse, and the only thing that distinguishes the two is watching insertions at the same time. Here insertions did rise slightly, and 182 against 21 is the trade actually on offer.
 
-Zero stitch points lost three or more meaningful words. 161 of 736 lost at least one: 149 lost exactly one word, 12 lost two. Pooled across all 736 disagreements, the two readings contained 1,254 meaningful words between them and 1,081 survived to the committed transcript (86.2%).
+**We do not publish an absolute word error rate from this instrument.** The AMI reference is the time-ordered union of every speaker's channel, so where two people talk at once it interleaves words no single-stream decoder can emit in order, and each scores as an error however good the recognizer is. That bias is large and constant across builds, which is why the change is meaningful while the level is not.
 
-That 86.2% is not a bug count — most of the missing words *cannot* survive, because the two windows heard **different words for the same syllables**. When one window hears "cat" and the other hears "cut", committing both would duplicate the utterance; one reading has to lose. The missing words break down into a few recurring shapes, all visible in the example table below:
+### How hard the assignment is
 
-- **Rival readings of the same audio** — "cat" vs. "cut", "padded" vs. "parrot". One is committed, the other is counted as lost. Where the engine detects this case it also records the discarded alternative and hands both readings to the LLM cleanup pass instead of deciding silently.
-- **Two renderings of the same word** — "'cause" vs. "because", "colour" vs. "color". The word survived; the count is strict enough to flag the spelling that didn't.
-- **Half-words at a window edge** — a window boundary cut through a word and one side caught only a fragment ("ree", "arging"). The complete word usually exists in the other reading and is committed; the stranded fragment counts as lost.
-- **Genuinely dropped words** — the honest residue. One reading held a word ("range", "fine", "three thirty") that the committed transcript does not contain in any form. Checked against the human reference, most of these turn out to be mishearings that deserved to lose; the real losses are concentrated in simultaneous speech, where the two windows latched onto different speakers and one mixed audio channel can't keep both.
+| | previous | current |
+|---|---:|---:|
+| Reference words spoken over another speaker | 30.0% | 30.0% |
+| Deletion rate within overlapped speech | 43.8% | **43.5%** |
+| Deletion rate on clean speech | 5.1% | **4.9%** |
 
-## Example stitches
+Nearly a third of the words in this corpus are spoken over somebody else, and inside that population deletion runs at 43.5% against 4.9% on clean speech. That gap is close to a statement about physics: one mixed channel, two simultaneous talkers. It is also why individual meetings spread so widely — the argumentative EN sessions lose far more than the ES sessions, which is the crosstalk rate showing through rather than a difference in transcription quality.
 
-Real rows from the benchmark, quoted as decoded (readings truncated to the disagreement region). "Lost" lists meaningful words from either reading that are absent from the committed transcript. The last column quotes what AMI's human reference says the speakers said at that moment — so you can judge each stitch yourself.
+The clean-speech figure is the recognition-quality signal, and the one to read for what the recognizer does when given a fair chance.
 
-| Meeting | Time | One window heard | The other heard | Committed | Lost | Human reference |
-|---|---|---|---|---|---|---|
-| IS1009a | 0:59 | "is" | "we do is" | "we do is" | — | "the first thing we do is introduce ourselves" |
-| ES2004c | 6:04 | "Yeah, okay." | "Unless anyone" | "Yeah, okay. Unless anyone" | — | two speakers at once: "Yeah, okay." + "Unless anyone has any questions" |
-| EN2002a | 16:29 | "those stuff?" | "their stuff" | "their stuff?" | — | "wanna talk about their stuff?" |
-| IS1009a | 4:57 | "cat." | "cut" | "cut." | cat | "traditional kitty cat." |
-| ES2004c | 10:27 | "'cause" | "because" | "because" | 'cause | "'cause they use them quite frequently" |
-| ES2004c | 5:10 | "ree." | "ird. It's still" | "ird. It's still" | ree | "first is actually third is still important" |
-| ES2004c | 18:41 | "padded" | "parrot" | "padded" | parrot | "parrot green to chilli red" |
-| IS1009a | 4:04 | "write this" | "range" | "write this" | range | "I can't write with this thing." |
-| IS1009a | 12:47 | "have well we have a trying" | "fine" | "have well we have a trying" | fine | "we have well, we have a twen two two two three minutes" |
-| ES2004c | 35:59 | "? Yeah for the decisions that we've got" | "ions that we've made" | "? Yeah for the decisions that we've got" | ions, made | "for the decisions that we've made" |
-| EN2002a | 31:36 | "…What's w what would you prefer?" | "Or three thirty" | "…What's w what would you prefer?" | three, thirty | two speakers at once: "Three's good though… what would you prefer?" + "Or three thirty." |
+## How badly do losses clump
 
-The first three rows are the normal case (575 of 736): the readings differ, and the committed transcript keeps everything meaningful — the fuller reading, both halves of a two-speaker moment (6:04), or words from one reading and punctuation from the other (16:29). The lossy rows carry their own verdicts. On rival readings the committed pick goes both ways — right at 4:04 and 5:10, wrong at 4:57, 18:41, and 35:59 — which is exactly why those disagreements are recorded and handed to the LLM cleanup pass rather than decided silently. And the reference reclassifies the "genuine" drops: "range" and "fine" were themselves mishearings that deserved to lose, leaving 31:36 as the table's one real casualty — two people spoke at once, and one mixed audio channel kept one of them.
+A hundred scattered single words is a transcript you can read. One 24-word run is a missing paragraph. Clean speech only:
 
-## Per-meeting results
+| Consecutive words lost | previous | current |
+|---|---:|---:|
+| 1 word | 1,801 | 1,810 |
+| 2 to 4 words | 617 | 618 |
+| 5 to 9 words | 53 | **47** |
+| **10 or more words** | **16** | **15** |
+| Longest single run | 26 | **24** |
 
-<!-- MERGE_SEAM_PER_MEETING:BEGIN -->
-| Meeting | Stitch points | Lost ≥1 word | Lost 3+ words | Committed words | Content-word recall |
-|---|---:|---:|---:|---:|---:|
-| IS1009a | 37 | 9 | 0 | 1,713 | 83.9% |
-| ES2004c | 115 | 25 | 0 | 6,093 | 88.7% |
-| EN2002a | 110 | 34 | 0 | 5,400 | 73.3% |
-| TS3003b | 115 | 22 | 0 | 4,573 | 91.7% |
-| TS3003d | 121 | 19 | 0 | 4,516 | 85.9% |
-| IS1009c | 101 | 17 | 0 | 4,092 | 92.2% |
-| ES2004a | 40 | 11 | 0 | 2,177 | 83.8% |
-| EN2002b | 97 | 24 | 0 | 4,474 | 73.0% |
-<!-- MERGE_SEAM_PER_MEETING:END -->
+The improvement is concentrated where it matters. Long runs fell and single-word losses rose slightly, which is the right direction: an isolated missing word is a typo a reader recovers from, and a 24-word run is a vanished paragraph with nothing left to signal it was ever there.
 
-The two EN2002 meetings score lowest on recall — they are the most argumentative in the set, with the heaviest simultaneous speech. AMI's reference merges each speaker's individual headset microphone into one transcript, so it contains overlapping speech that no single mixed audio channel can fully capture; that caps recall independent of transcription quality.
+**This table counts deletions only** and never appears without the insertion count beside it, for the reason given above.
 
-## Content-word recall vs. a human transcript
+## Sentence punctuation and casing
 
-Stitch integrity shows the stitching step isn't the thing losing words. A separate, harder question is how much of what was said makes it into the transcript at all — that depends on the recognizer too, not just the stitching. Against AMI's human-corrected references, 83.3% of meaningful reference words (16,511 of 19,831) appear in what MimicScribe committed live, across all 8 meetings.
+*11 Earnings-21 calls, token-aligned against Rev.com human references. Scored on the speaker turns a reader actually sees.*
 
-Both sides are normalized the same way before comparison — case-folded, fillers dropped, punctuation stripped — so formatting differences don't count as misses. A stricter companion measurement is planned: reprocessing the same audio without the real-time constraint, to separate how much of the gap is inherent to transcribing live versus recoverable with more time.
+| | previous | current | |
+|---|---:|---:|---|
+| Sentence-ending precision | 86.5% | 86.4% | of the sentence ends written, the share a human also placed |
+| Sentence-ending recall | 82.5% | **82.7%** | of the sentence ends a human wrote, the share found |
+| Boundary recall | 93.9% | **94.3%** | sentence ends at a speaker handoff, the ones that stop two speakers running together |
+| Sentence-start capitalization | 83.9% | **84.0%** | of real sentence starts, the share capitalized |
+| Capitalization precision | 89.8% | **89.9%** | counter-check: a rule that capitalizes indiscriminately buys the row above and loses this one |
 
-## Sentence punctuation
+Terminal punctuation is not cosmetic here. Sentence boundaries become the windows used for speaker embedding, so a punctuation change is also a speaker-identification change, which is why recall carries a hard floor rather than being traded for precision.
 
-Sentence-ending marks (`.` `?` `!`) decide where sentences begin and end in the transcript you read and export. Measured against Rev.com's human-punctuated Earnings-21 references (11 calls, token-aligned):
+## Live display stability
 
-- **Precision 79.7%** — of the sentence ends the engine wrote, four in five match a human transcriptionist's placement.
-- **Recall 82.2%** — of the sentence ends the human reference contains, the engine found four in five.
-- **Boundary recall 92.8%** — sentence ends at a speaker handoff, the ones that keep two speakers' words from running together, survive at a higher rate than sentence ends overall.
+"Text shown as final stays final." The display commits in two tiers and the promise attaches only to the committed tier.
 
-## Corpora
+| | |
+|---|---:|
+| Committed text that later changed | **0.65%** |
+| Provisional tail text that later changed | 7.33% |
+| Words the renderer dropped entirely | **0** |
+| Revisions inside the trailing 60 s, per corpus | 745 (68% single-word) |
 
-- **[AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)** (CC BY 4.0) — real recorded workplace meetings with professionally corrected transcripts. 8 meetings: IS1009a, IS1009c, ES2004a, ES2004c, EN2002a, EN2002b, TS3003b, TS3003d. Used for stitch integrity and content-word recall.
-- **[Earnings-21](https://github.com/revdotcom/speech-datasets)** — 11 real earnings calls with Rev.com human transcripts that include punctuation and casing. Used for sentence-punctuation accuracy, because AMI's references aren't punctuated to reference quality.
+The roughly 11x gap between the tiers is the entire case for showing them differently. The committed number was 0.39% in an earlier release and rose to 0.65% deliberately: a faster commit policy roughly halved the time to a final transcript and cost some stability. Both halves of that trade are published rather than only the half that improved.
 
-Benchmark numbers come from fixed public corpora, not your meetings. Real meetings vary — accents, cross-talk, background noise, and call-audio quality all change what the recognizer hears in the first place. Stitch integrity measures whether the stitching step throws away words the recognizer *did* hear; it says nothing about words the recognizer never heard.
+Basis: 4 recorded capture sessions, not the 16-meeting corpus. **These two sections are the one place on this page where the numbers predate the current build** — they are replayed from recorded sessions, so refreshing them means re-recording rather than re-scoring. See provenance.
 
-## Method notes
+## Latency to trust
 
-- **Stitch integrity is self-referential.** It compares the pipeline against itself — did the committed transcript keep what either of its own windows heard — so it needs no human reference and stays valid across recognition-model changes.
-- **"Meaningful word" is deliberate.** Fillers and function words ("um", "okay", "the") are excluded from the loss count so a dropped "uh" doesn't count the same as a dropped "range". The full stopword-filtered count is what's reported everywhere on this page.
-- **Recall is scored against the union of all AMI speaker channels**, including overlapped speech — the hardest fair reading of the reference.
-- **Reference quotes in the example table are verbatim** from the AMI word annotations at each stitch point's timestamp, including the reference's own disfluency fragments (the "twen" at 12:47 is what the human transcriber wrote — the speaker cut the word off). No aggregate "pick accuracy vs. reference" number is published: the curated rows let you judge individual stitches, but a headline rate would need its own properly pinned metric.
-- The per-row LLM-judge scores used during development are diagnostic and not published as results; judge-model changes would break comparability.
+How long after you stop speaking until the words stop moving.
+
+| Capture | Pauses measured | Median pause to commit |
+|---|---:|---:|
+| ES2004a | 52 | 7.6 s |
+| IS1009b | 36 | 4.5 s |
+| IS1009c | 58 | 5.6 s |
+| TS3003a | 85 | 5.5 s |
+
+**4.5 to 7.6 s**, against **10.3 to 11.0 s** under the earlier commit policy. This is what the stability trade above was paid for.
+
+## Determinism
+
+Same audio in, byte-identical transcript out, verified rather than asserted. Two independently compiled binaries, built from different trees, produced byte-identical output across all 16 meetings — identical not only in text but in per-token frame indices.
+
+Sampling-based systems cannot claim this, and it is load-bearing for everything above: a comparison between two configurations means nothing unless each is reproducible alone.
+
+## Corpora and caveats
+
+- **[AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)** (CC BY 4.0), 16 meetings, 8.5 hours, far-field single distant microphone, which is the hard condition. Scored against the union of all speaker channels *including* overlapped speech, the hardest fair reading.
+- **[Earnings-21](https://github.com/revdotcom/speech-datasets)**, 11 earnings calls with Rev.com human references including punctuation and casing.
+
+Benchmark numbers come from fixed public corpora, not from your meetings. Real meetings vary, and accents, cross-talk, background noise and call-audio quality all change what the recognizer hears in the first place.
+
+Far-field results are not comparable to near-field ones. Blending the two produces a figure that describes neither.
+
+The word-accuracy figures above are AMI only. Earnings-21 appears on this page for punctuation and casing, and the two corpora are not aggregated.
+
+## Provenance
+
+| Axis | Commit | Measured | Basis |
+|---|---|---|---|
+| Word accuracy, loss clumping, crosstalk split | `e95af8fc` | 2026-08-14 | 16 AMI meetings |
+| Sentence punctuation and casing | `e95af8fc` | 2026-08-14 | 11 Earnings-21 calls |
+| Determinism | `95ab236d` vs its parent | 2026-08-13 | 16 AMI meetings |
+| Live display stability | not recorded | 2026-08-09 | 4 capture sessions |
+| Latency to trust | not recorded | 2026-08-10 | 4 capture sessions |
+
+Both columns of every comparison above were decoded from **one build**, with the previous-build arm produced by asking that build for the earlier configuration rather than by quoting an older run. That control reproduced the previously published figures to the digit — deletions, insertions, substitutions and every run-length bucket — so the differences reported here are the change and not measurement drift.
+
+The last two rows carry no commit. Those campaigns pinned dates and capture stamps but not a commit, and they are reported as unrecorded rather than backfilled with a plausible guess, because a guessed commit is indistinguishable from a verified one once written down.
+
+Model: `parakeet-tdt-0.6b-v3`, CoreML, Apple Silicon.
+
+## Pins
+
+The values the next release is measured against. A pin is not a target; it is the number a regression has to get past unnoticed, and publishing it is what stops that happening quietly.
+
+| Pinned value | Class | Pin |
+|---|---|---:|
+| Renderer dropped words | must not worsen | 0 |
+| Runs of 10+ consecutive words lost | must not rise | 15 |
+| Longest single run of lost words | must not rise | 24 |
+| Reference words deleted | regression bar | 13,489 |
+| Words inserted | regression bar | 2,989 |
+| Clean-speech deletion rate | regression bar | 4.9% |
+| Committed text later changed | ceiling 1.0% | 0.65% |
+| Sentence-ending recall | must not worsen | 82.7% |
+| Boundary recall at speaker handoffs | must not worsen | 94.3% |
+| Sentence-start capitalization | regression bar | 84.0% |
+| Determinism | must hold | byte-identical |
+
+Three rules govern how these may be read, and each exists because ignoring it produced a wrong published number here at least once:
+
+1. **A number is only valid for the configuration that ships.** Two numbers on an earlier version of this page were not: one set was five weeks stale, the other came from a policy reachable only by disabling the shipping one. Both read exactly like current numbers.
+2. **Deletion-only measures never appear alone.** A mechanism that recovers words by inventing them improves every deletion count here, so insertions are published beside deletions or neither is published.
+3. **An unchanged result must be proven to have run.** A cached decode once reported an entire change as having no effect with every gate green. Both arms above reported a fully cold decode, and an arm that reports no cache misses is discarded rather than believed.
+
+Every number on this page is produced by a committed script that a later release can re-run. An earlier version carried a family of figures whose analysis code was never committed and whose input was not archived, which meant they could never be checked for drift; they were removed rather than restated.
 
 ## Reproducing
 
-This run was produced at `parakeet-transcriber` commit `63e09f62` with default parameters:
+The scorers are the same ones that gate changes internally, unmodified — there is no public-only scoring path.
 
 ```bash
-# per meeting: decode + record every window-overlap disagreement
-scripts/merge_loss_table.py --file <AMI meeting>.wav --cache /tmp/mlt_<meeting>.json
-# compose the pinned report (stitch integrity, distribution, recall, punctuation)
-scripts/merge_seam_report.py
-# punctuation arm (Earnings-21 run directory)
-scripts/punctuation_accuracy.py <run_dir>
+# one decode per arm, 16 AMI meetings + 11 Earnings-21 calls
+swift build -c release
+.build/release/mimicscribe --benchmark-pipeline-corpus --corpora ami,earnings21 --files <list>
+
+# word accuracy, crosstalk split, loss clumping
+scripts/score_corpus_wer.py --arms <A> <B> --labels base curr --stratify
+scripts/asr_bench.py       --arms <A> <B> --labels base curr
+
+# punctuation and casing
+scripts/punctuation_accuracy.py --compare <A> <B>
 ```
 
-The pinned source of truth is `benchmark/results/asr-merge/merge_seam_baseline.json`, which records the corpus list, a checksum of the AMI annotations, and the regression rule: no change ships if it lowers stitch integrity, introduces a 3+-word drop, or lowers any meeting's committed content words.
+Pin the output directory of each arm explicitly. The scorers default to the newest directory on disk, which silently picks up whatever else has been run since.
