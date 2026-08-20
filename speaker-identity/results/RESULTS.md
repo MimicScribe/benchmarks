@@ -79,9 +79,23 @@ Under a one-probe-per-returning-speaker protocol, AMI measures 99.4% correct
 bounds) — zero wrong identifications on both, with the entire gap being
 additional refusals, never wrong names. ICSI also enables a larger same-room
 impostor test than AMI supports (410 trials of people probing their actual
-room-mates' profiles): one wrong match appeared (0.2%). That is the honest
-number at higher statistical power, and ICSI now runs as a standing
-validation corpus alongside AMI.
+room-mates' profiles): one wrong match appeared (0.2%). That is the number
+at higher statistical power, and ICSI now runs as a standing validation
+corpus alongside AMI.
+
+## Switching devices
+
+A profile enrolled on one microphone and heard on a very different one is the
+hardest realistic case for a returning speaker. Measured with AMI's two capture
+chains standing in for a device switch (headset for enrollment, distant room
+array for recognition): with full-meeting evidence the switch costs little —
+95% recognized versus 97% on the matched device — but with only 20 seconds of
+heard speech, recognition drops to 25% versus 63%, all of it refusals rather
+than wrong names. Once a single meeting on the new device is confirmed into
+the profile, 20-second recognition recovers to 41%
+and keeps climbing with more evidence, at no change to the false-accept rate.
+The app's enrollment flow adds that meeting automatically once the speaker is
+confirmed.
 
 ## What keeps profiles accurate
 
@@ -103,6 +117,15 @@ work together:
   alone. This is what makes multiple voiceprints safe: in our measurements it
   removed every same-room false accept that a naive best-match rule produced
   (5 of 1,401 stranger trials → 0), at no cost in correct identifications.
+- **A profile deliberately shared by two people keeps one voiceprint per
+  person.** Merging two people into one profile is the user's decision and
+  is never second-guessed. Averaging the two voices together would cost the
+  members a quarter of their full-meeting
+  recognitions (99% → 73%), while per-person voiceprints keep members
+  recognized exactly as reliably as separate profiles would, with no change
+  to anyone else's accuracy or to false accepts. Verified on both corpora,
+  and the result holds even when one member speaks a tenth as much as the
+  other.
 - **Close calls are refused, and visibly.** When two profiles score within an
   ambiguity margin of each other, the app refuses the match and surfaces the
   conflict instead of silently picking one.
@@ -126,6 +149,9 @@ work together:
 - Enrollment and probe speech are drawn from talkative meeting participants
   (AMI's minimum is ~26 s per session), which is mildly optimistic for a
   genuinely quiet participant.
+- The device-switch numbers use AMI's headset-vs-array chains as a stand-in
+  for a real device switch; the shape of the result is the claim, the exact
+  percentages are corpus-specific.
 
 ## Methodology
 
@@ -137,6 +163,13 @@ so no recognition audio ever contributes to the profile it is scored against.
 False-accept trials probe every profile with speakers who co-occurred in the
 same rooms — the hardest impostor population — plus cross-corpus strangers.
 
+The results above are measured on reference-segmented speech. Re-scoring
+the same decision rules on the app's own diarizer output over real
+recordings gave the same outcome: the main voice cluster for each speaker
+was recognized as the benchmark predicts, and every failure was a refusal,
+not a wrong name. The benchmark also runs as a regression gate: a change to
+profile logic must reproduce these results exactly before it ships.
+
 ## Reproducibility
 
 Produced at `parakeet-transcriber` commit `9df400c9` with production default
@@ -144,4 +177,8 @@ parameters on the cached AMI embedding substrate. The enrollment-floor and
 suggestion-timing rows were produced at commit `8efacf56` on the same
 substrate, also with production default parameters; the enrollment-floor
 recalibration (30 → 20 seconds) was produced at commit `afc0a31f`, and the
-second-corpus (ICSI) validation at commit `126c0a05`.
+second-corpus (ICSI) validation at commit `126c0a05`. The device-switch and
+shared-profile measurements were produced at commits `6a62b013`, `5fed6281`,
+and `468c3f59`, and the shared-profile follow-ups and diarizer-output check
+at commits `323421b3` and `d1067e57` — production default parameters
+throughout.
