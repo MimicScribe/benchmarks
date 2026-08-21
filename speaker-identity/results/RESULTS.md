@@ -4,7 +4,7 @@ How reliably does the app recognize a *returning* speaker — someone with a sav
 voice profile — in a new meeting? This is a different question from diarization
 (who spoke when, within one meeting), and it is scored separately.
 
-Run date: 2026-08-01
+Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20)
 
 ## What is measured
 
@@ -126,6 +126,19 @@ work together:
   to anyone else's accuracy or to false accepts. Verified on both corpora,
   and the result holds even when one member speaks a tenth as much as the
   other.
+- **Every voiceprint is checked against the audio it was built from.**
+  Measured on 141 speaker segments from six committed recordings, stored
+  voiceprints cover 99.0% of the speech they stand for (up from 91.0%), and
+  none claims audio it never heard (0 of 141).
+- **Confirming a name cannot fold a second voice into a profile.** A
+  confirmed speaker's turns have to agree with one another first. Calibrated
+  on 792 ground-truth identities across 200 AMI sessions: 4.8% of genuine
+  speakers refused, 16.2% of even two-person blends let through.
+- **A profile built from too little evidence gets rebuilt, not defended.**
+  When you confirm a speaker and the saved profile still does not recognize
+  them, a profile with too thin a history is rebuilt from the recording you
+  confirmed. One Undo reverses it. A profile with a real history is left
+  alone.
 - **Close calls are refused, and visibly.** When two profiles score within an
   ambiguity margin of each other, the app refuses the match and surfaces the
   conflict instead of silently picking one.
@@ -149,6 +162,9 @@ work together:
 - Enrollment and probe speech are drawn from talkative meeting participants
   (AMI's minimum is ~26 s per session), which is mildly optimistic for a
   genuinely quiet participant.
+- The voiceprint-coverage numbers come from six recordings on one machine.
+  They say the stored voiceprints are honest about their audio; they do not
+  claim a recognition gain.
 - The device-switch numbers use AMI's headset-vs-array chains as a stand-in
   for a real device switch; the shape of the result is the claim, the exact
   percentages are corpus-specific.
@@ -181,4 +197,9 @@ second-corpus (ICSI) validation at commit `126c0a05`. The device-switch and
 shared-profile measurements were produced at commits `6a62b013`, `5fed6281`,
 and `468c3f59`, and the shared-profile follow-ups and diarizer-output check
 at commits `323421b3` and `d1067e57` — production default parameters
-throughout.
+throughout. The voiceprint-evidence rows were produced at commit `dc0bd03d`
+(against `c57c3bec` for the before arm) with
+`scripts/evidence_retention.py --batch` over the committed golden pairs in
+`Tests/Fixtures/golden_pairs`, each replayed with `--replay-raw-pair`; the
+cluster-consistency calibration with `scripts/coherence_floor_rttm.py` at
+default parameters on the cached AMI embedding substrate.
