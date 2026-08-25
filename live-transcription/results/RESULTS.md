@@ -11,7 +11,7 @@ Run date: 2026-08-25. Corpus: 16 AMI far-field meetings, 8.5 hours, single dista
 | **Deletion rate on clean (non-overlapped) speech** | **3.7%** |
 | Deletion rate on speech spoken over another speaker | 41.2% |
 | Runs of 10+ consecutive words lost, whole corpus | **5** in 8.5 hours, 4 of them at the edge of crosstalk |
-| Longest single run of lost words | 14 |
+| Longest single run of lost words | 14, at a crosstalk edge |
 | Sentence-ending punctuation, precision / recall | 86.1% / 83.0% |
 | Sentence ends preserved at speaker handoffs | 94.4% |
 | Sentence starts rendered capitalized | 84.8% |
