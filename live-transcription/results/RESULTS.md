@@ -127,10 +127,10 @@ checked against the session's script as performed.
 | | |
 |---|---:|
 | Doubled phrases (4+ words) visible in the live view | **2 episodes** in 32.9 min |
-| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **6 episodes** |
-| Words shown fused with a fragment of themselves ("Turningning") | **2 episodes**, 0 reaching the final text |
-| Words shown that were never spoken | 732 |
-| Spoken words that never appeared on screen | 162 |
+| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **7 episodes** |
+| Words shown fused with a fragment of themselves ("Turningning") | **1 episode**, 0 reaching the final text |
+| Words shown that were never spoken | 744 |
+| Spoken words that never appeared on screen | 166 |
 
 The last two rows are scored on the five sessions with a verbatim script
 (24.2 minutes, 3,337 script words) and count every distinct rendering that
@@ -140,10 +140,10 @@ misrecognitions. They are regression bars, not quality claims: what they
 exist to catch is a build that makes the live view invent or withhold more
 than this one does.
 
-The fusion row is new in this run. Transcription reads overlapping windows of
-audio, and where two windows are stitched a word can be rendered with a piece
-of itself attached. Both episodes here were corrected before the text settled;
-the median one was on screen for about three seconds. The check needs the
+Transcription reads overlapping windows of audio, and where two windows are
+stitched a word can be rendered with a piece of itself attached. The one
+episode here was corrected within the second it appeared, before the text
+settled. The check needs the
 system word list to run at all, and reports nothing rather than guessing when
 it is absent — several hundred ordinary English words have the same shape as a
 fusion, so counting them without a dictionary would produce noise.
@@ -159,11 +159,46 @@ and "one hundred and fifteen million dollars" count as the same number.
 | Rendered as a different quantity | 1 |
 | Dropped | 8 |
 | Numbers shown that nobody said | 4 |
+| Numbers damaged where two decoding windows were stitched | 0 in the final view (2 shown briefly, then repaired) |
 
 One of the five scripted sessions is a numbers-heavy earnings call and carries
 58 of the 146; the other four are conversational and carry 18 to 24 each. This
 is a thin basis for a number-accuracy claim and is published as a regression
 bar, not as a quality figure.
+
+### Numbers in the saved transcript
+
+The live view is one pass over the audio; the transcript you keep is the one
+that matters. The same by-value check is run on the saved transcript of the
+11 Earnings-21 calls against Rev.com's human references — 2,851 spoken
+quantities, the densest public substrate for numbers we have.
+
+| | |
+|---|---:|
+| Spoken quantities that reached the saved transcript intact | 2,646 of 2,851 (92.8%) |
+| Rendered as a different quantity | 74 |
+| Dropped | 131 |
+| Numbers in the transcript that nobody said | 208 |
+
+By kind of number:
+
+| | scored | intact | different | dropped | nobody said |
+|---|---:|---:|---:|---:|---:|
+| Plain counts and amounts | 1,077 | 944 | 40 | 93 | 131 |
+| Money | 367 | 327 | 25 | 15 | 11 |
+| Percentages | 408 | 400 | 6 | 2 | 5 |
+| Years | 266 | 260 | 3 | 3 | 43 |
+| Fiscal quarters | 432 | 428 | 1 | 3 | 3 |
+| Ordinals | 223 | 211 | 0 | 12 | 12 |
+
+Of the 205 quantities that were rendered wrong or dropped, 198 were already
+wrong or missing in the recognizer's own output; the written-form step that
+turns "one hundred and fifteen million dollars" into "$115 million" broke 8
+and repaired 64. That step is what a change to number handling is gated on,
+by kind of number and by which of the two stages moved each one. These are
+the first numbers of this kind on the page and are published as a regression
+bar; the substrate is prepared remarks read from a page, so they say nothing
+about numbers spoken over another speaker.
 
 ## Determinism
 
@@ -191,7 +226,8 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 | Determinism | `95ab236d` vs its parent | 2026-08-13 | 16 AMI meetings |
 | Live display stability | not recorded | 2026-08-09 | 4 capture sessions |
 | Latency to trust | not recorded | 2026-08-10 | 4 capture sessions |
-| Live view against the script | `4a0dfb86` | 2026-08-25 | 7 capture sessions (script rows: 5) |
+| Live view against the script | `07f24f7f` | 2026-08-27 | 7 capture sessions (script rows: 5) |
+| Numbers in the saved transcript | `e7128fbb` | 2026-08-27 | 11 Earnings-21 calls (2,851 quantities) |
 
 Both columns of every comparison above were decoded from **one build**, with the previous-build arm produced by asking that build for the earlier configuration rather than by quoting an older run. That control reproduced the previously published figures to the digit — deletions, insertions, substitutions and every run-length bucket — so the differences reported here are the change and not measurement drift.
 
@@ -216,13 +252,16 @@ The values the next release is measured against. A pin is not a target; it is th
 | Boundary recall at speaker handoffs | must not worsen | 94.4% |
 | Sentence-start capitalization | regression bar | 84.8% |
 | Doubled phrases visible live | regression bar | 2 |
-| Punctuation-identical duplicated spans | regression bar | 6 |
-| Words shown fused with a fragment of themselves | regression bar | 2 |
-| Words shown never spoken | regression bar | 732 |
-| Spoken words never shown | regression bar | 162 |
+| Punctuation-identical duplicated spans | regression bar | 7 |
+| Words shown fused with a fragment of themselves | regression bar | 1 |
+| Words shown never spoken | regression bar | 744 |
+| Spoken words never shown | regression bar | 166 |
 | Spoken quantities rendered as a different quantity | regression bar | 1 |
 | Spoken quantities dropped | regression bar | 8 |
 | Numbers shown that nobody said | regression bar | 4 |
+| Saved-transcript quantities rendered as a different quantity | must not rise, per call | 74 |
+| Saved-transcript quantities dropped | must not rise, per call | 131 |
+| Saved-transcript numbers nobody said | must not rise, per call | 208 |
 | Determinism | must hold | byte-identical |
 
 The live-view bars are enforced per session with a measured tolerance for
@@ -230,11 +269,12 @@ replay timing jitter (the same recording replayed twice moves the word
 counts by a few dozen), plus a tighter cap on the total across sessions —
 uncorrelated jitter and a systematic regression separate cleanly there.
 
-The live-view and number bars moved onto a seven-session basis this run, up
-from six, so they are not comparable to the previous page's figures as a
-change. On the six sessions common to both, duplicated spans went from 8 to 4
-and the two script rows moved by 11 and 3 words — differences inside the
-replay jitter named above, which is why no improvement is claimed from them.
+The live-view rows were re-measured on the same seven sessions as the
+previous page (one replay of each): duplicated spans 6 to 7, fusions 2 to 1,
+the two script rows 732 to 744 and 162 to 166, every number row unchanged.
+Each of those movements is inside the replay jitter named above, so no
+change in either direction is claimed from them; they are the values the
+next release is measured against.
 
 Three rules govern how these may be read, and each exists because ignoring it produced a wrong published number here at least once:
 
@@ -263,6 +303,10 @@ scripts/punctuation_accuracy.py --compare <A> <B>
 # the live view against the script (replays the recorded sessions live)
 scripts/score_live_invariants.py --all <replay-root> --json-out chg.json
 scripts/score_live_invariants.py --compare <pinned baseline> chg.json
+
+# numbers in the saved transcript, by value, 11 Earnings-21 calls
+scripts/score_number_fidelity.py --corpus <A>/per-file --json-out chg.json
+scripts/score_number_fidelity.py --corpus-compare <pinned baseline> chg.json
 ```
 
 Pin the output directory of each arm explicitly. The scorers default to the newest directory on disk, which silently picks up whatever else has been run since.
