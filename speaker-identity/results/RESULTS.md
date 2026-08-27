@@ -4,7 +4,7 @@ How reliably does the app recognize a *returning* speaker — someone with a sav
 voice profile — in a new meeting? This is a different question from diarization
 (who spoke when, within one meeting), and it is scored separately.
 
-Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20)
+Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20; merge-across-recordings row added 2026-08-27)
 
 ## What is measured
 
@@ -147,6 +147,27 @@ work together:
   alternatives that measured no better — or actively worse — than the simpler
   approach are not in the app.
 
+## Merging two recordings of the same voice
+
+When you merge two meetings, an unnamed speaker in one may be the same person
+as an unnamed speaker in the other. The app decides that automatically, from
+voice alone, and the two costs are not symmetric: two rows a person can
+merge in one click, versus two people fused into one identity. Measured on
+AMI — 975 pairs of the same speaker across two recordings, 2,646 pairs of
+different speakers from the same room and series, 218,823 from different
+rooms — with both recordings cut to the same amount of speech:
+
+| Speech per recording | Same speaker unified | Different speakers fused (same room) | Different speakers fused (different rooms) |
+|---|---|---|---|
+| 20 seconds | 13.8% (135 of 975) | 0 of 2,646 | 0 of 218,823 |
+| 40 seconds | 50.3% (490 of 975) | 6 of 2,646 | 0 of 218,823 |
+| Full meeting | **93.0%** (907 of 975) | **0 of 2,646** | **0 of 218,823** |
+
+Short recordings split rather than fuse. The six wrong fusions at 40 seconds
+all trace to reference clusters whose first 40 seconds contain a second
+speaker's voice; at full-meeting evidence the same pairs score far apart.
+Below 20 seconds the app does not unify on voice at all.
+
 ## Honest caveats
 
 - AMI headset and room-microphone conditions are acoustically closer to each
@@ -202,4 +223,7 @@ throughout. The voiceprint-evidence rows were produced at commit `dc0bd03d`
 `scripts/evidence_retention.py --batch` over the committed golden pairs in
 `Tests/Fixtures/golden_pairs`, each replayed with `--replay-raw-pair`; the
 cluster-consistency calibration with `scripts/coherence_floor_rttm.py` at
-default parameters on the cached AMI embedding substrate.
+default parameters on the cached AMI embedding substrate. The
+merge-across-recordings row was produced at commit `866a9299` with
+`scripts/identity_decision_cells.py mergepair` on the same substrate, default
+parameters.
