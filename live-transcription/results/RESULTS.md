@@ -127,10 +127,10 @@ checked against the session's script as performed.
 | | |
 |---|---:|
 | Doubled phrases (4+ words) visible in the live view | **2 episodes** in 32.9 min |
-| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **7 episodes** |
-| Words shown fused with a fragment of themselves ("Turningning") | **1 episode**, 0 reaching the final text |
-| Words shown that were never spoken | 744 |
-| Spoken words that never appeared on screen | 166 |
+| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **5 episodes** |
+| Words shown fused with a fragment of themselves ("Turningning") | **2 episodes**, 0 reaching the final text |
+| Words shown that were never spoken | 740 |
+| Spoken words that never appeared on screen | 164 |
 
 The last two rows are scored on the five sessions with a verbatim script
 (24.2 minutes, 3,337 script words) and count every distinct rendering that
@@ -257,10 +257,10 @@ The values the next release is measured against. A pin is not a target; it is th
 | Boundary recall at speaker handoffs | must not worsen | 94.4% |
 | Sentence-start capitalization | regression bar | 84.8% |
 | Doubled phrases visible live | regression bar | 2 |
-| Punctuation-identical duplicated spans | regression bar | 7 |
-| Words shown fused with a fragment of themselves | regression bar | 1 |
-| Words shown never spoken | regression bar | 744 |
-| Spoken words never shown | regression bar | 166 |
+| Punctuation-identical duplicated spans | regression bar | 5 |
+| Words shown fused with a fragment of themselves | regression bar | 2 |
+| Words shown never spoken | regression bar | 740 |
+| Spoken words never shown | regression bar | 164 |
 | Spoken quantities rendered as a different quantity | regression bar | 1 |
 | Spoken quantities dropped | regression bar | 8 |
 | Numbers shown that nobody said | regression bar | 4 |
@@ -275,8 +275,9 @@ counts by a few dozen), plus a tighter cap on the total across sessions —
 uncorrelated jitter and a systematic regression separate cleanly there.
 
 The live-view rows were re-measured on the same seven sessions as the
-previous page (one replay of each): duplicated spans 6 to 7, fusions 2 to 1,
-the two script rows 732 to 744 and 162 to 166, every number row unchanged.
+previous page (one replay of each): duplicated spans 6 to 5, fusions
+unchanged at 2, the two script rows 732 to 740 and 162 to 164, every number
+row unchanged.
 Each of those movements is inside the replay jitter named above, so no
 change in either direction is claimed from them; they are the values the
 next release is measured against.
