@@ -159,7 +159,7 @@ and "one hundred and fifteen million dollars" count as the same number.
 | Rendered as a different quantity | 1 |
 | Dropped | 8 |
 | Numbers shown that nobody said | 4 |
-| Numbers damaged where two decoding windows were stitched | 0 in the final view (2 shown briefly, then repaired) |
+| Numbers damaged where two decoding windows were stitched | 0 in the final view (1 shown briefly, then repaired) |
 
 One of the five scripted sessions is a numbers-heavy earnings call and carries
 58 of the 146; the other four are conversational and carry 18 to 24 each. This
@@ -170,35 +170,40 @@ bar, not as a quality figure.
 
 The live view is one pass over the audio; the transcript you keep is the one
 that matters. The same by-value check is run on the saved transcript of the
-11 Earnings-21 calls against Rev.com's human references — 2,851 spoken
+11 Earnings-21 calls against Rev.com's human references — 2,867 spoken
 quantities, the densest public substrate for numbers we have.
 
 | | |
 |---|---:|
-| Spoken quantities that reached the saved transcript intact | 2,646 of 2,851 (92.8%) |
-| Rendered as a different quantity | 74 |
-| Dropped | 131 |
-| Numbers in the transcript that nobody said | 208 |
+| Spoken quantities that reached the saved transcript intact | 2,768 of 2,867 (96.5%) |
+| Rendered as a different quantity | 43 |
+| Dropped | 56 |
+| Numbers in the transcript that nobody said | 112 |
 
 By kind of number:
 
 | | scored | intact | different | dropped | nobody said |
 |---|---:|---:|---:|---:|---:|
-| Plain counts and amounts | 1,077 | 944 | 40 | 93 | 131 |
-| Money | 367 | 327 | 25 | 15 | 11 |
-| Percentages | 408 | 400 | 6 | 2 | 5 |
-| Years | 266 | 260 | 3 | 3 | 43 |
-| Fiscal quarters | 432 | 428 | 1 | 3 | 3 |
-| Ordinals | 223 | 211 | 0 | 12 | 12 |
+| Plain counts and amounts | 1,032 | 977 | 24 | 31 | 87 |
+| Money | 364 | 348 | 10 | 6 | 2 |
+| Percentages | 408 | 400 | 6 | 2 | 4 |
+| Years | 310 | 304 | 2 | 4 | 0 |
+| Fiscal quarters | 442 | 439 | 1 | 2 | 3 |
+| Ordinals | 235 | 224 | 1 | 10 | 13 |
 
-Of the 205 quantities that were rendered wrong or dropped, 198 were already
-wrong or missing in the recognizer's own output; the written-form step that
-turns "one hundred and fifteen million dollars" into "$115 million" broke 8
-and repaired 64. That step is what a change to number handling is gated on,
-by kind of number and by which of the two stages moved each one. These are
-the first numbers of this kind on the page and are published as a regression
-bar; the substrate is prepared remarks read from a page, so they say nothing
-about numbers spoken over another speaker.
+Forty-two years in four of the human references are truncated ("first
+quarter of 201."); a transcript that shows the full year there is counted as
+correct, and the one such year the transcript missed is reported but not
+scored. The previous version of this page reported 2,646 of 2,851 intact;
+the scoring rules have been corrected since (truncated reference years,
+verbatim stutters, sub-cent amounts), and under today's rules the previous
+build reads 2,739 of 2,850 intact with 62 rendered as a different quantity
+and 152 invented. Most of the remaining change is at the point where two decoding
+windows are stitched, where the same figure read as digits on one side and as
+words on the other used to be kept twice or cut in half. This table is what a
+change to number handling is gated on, by kind of number, and it is published
+as a regression bar; the substrate is prepared remarks read from a page, so it
+says nothing about numbers spoken over another speaker.
 
 ## Determinism
 
@@ -226,8 +231,8 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 | Determinism | `95ab236d` vs its parent | 2026-08-13 | 16 AMI meetings |
 | Live display stability | not recorded | 2026-08-09 | 4 capture sessions |
 | Latency to trust | not recorded | 2026-08-10 | 4 capture sessions |
-| Live view against the script | `07f24f7f` | 2026-08-27 | 7 capture sessions (script rows: 5) |
-| Numbers in the saved transcript | `e7128fbb` | 2026-08-27 | 11 Earnings-21 calls (2,851 quantities) |
+| Live view against the script | `c7a50731` | 2026-08-27 | 7 capture sessions (script rows: 5) |
+| Numbers in the saved transcript | `504914b1` | 2026-08-27 | 11 Earnings-21 calls (2,867 quantities) |
 
 Both columns of every comparison above were decoded from **one build**, with the previous-build arm produced by asking that build for the earlier configuration rather than by quoting an older run. That control reproduced the previously published figures to the digit — deletions, insertions, substitutions and every run-length bucket — so the differences reported here are the change and not measurement drift.
 
@@ -259,9 +264,9 @@ The values the next release is measured against. A pin is not a target; it is th
 | Spoken quantities rendered as a different quantity | regression bar | 1 |
 | Spoken quantities dropped | regression bar | 8 |
 | Numbers shown that nobody said | regression bar | 4 |
-| Saved-transcript quantities rendered as a different quantity | must not rise, per call | 74 |
-| Saved-transcript quantities dropped | must not rise, per call | 131 |
-| Saved-transcript numbers nobody said | must not rise, per call | 208 |
+| Saved-transcript quantities rendered as a different quantity | must not rise, per call | 43 |
+| Saved-transcript quantities dropped | must not rise, per call | 56 |
+| Saved-transcript numbers nobody said | must not rise, per call | 112 |
 | Determinism | must hold | byte-identical |
 
 The live-view bars are enforced per session with a measured tolerance for
