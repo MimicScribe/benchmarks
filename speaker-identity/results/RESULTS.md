@@ -4,7 +4,7 @@ How reliably does the app recognize a *returning* speaker — someone with a sav
 voice profile — in a new meeting? This is a different question from diarization
 (who spoke when, within one meeting), and it is scored separately.
 
-Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20; merge-across-recordings row added 2026-08-27)
+Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20; merge-across-recordings row added 2026-08-27; device-switch row re-measured 2026-08-28)
 
 ## What is measured
 
@@ -90,9 +90,9 @@ hardest realistic case for a returning speaker. Measured with AMI's two capture
 chains standing in for a device switch (headset for enrollment, distant room
 array for recognition): with full-meeting evidence the switch costs little —
 95% recognized versus 97% on the matched device — but with only 20 seconds of
-heard speech, recognition drops to 25% versus 63%, all of it refusals rather
+heard speech, recognition drops to 26% versus 65%, all of it refusals rather
 than wrong names. Once a single meeting on the new device is confirmed into
-the profile, 20-second recognition recovers to 41%
+the profile, 20-second recognition recovers to 42%
 and keeps climbing with more evidence, at no change to the false-accept rate.
 The app's enrollment flow adds that meeting automatically once the speaker is
 confirmed.
@@ -216,7 +216,10 @@ substrate, also with production default parameters; the enrollment-floor
 recalibration (30 → 20 seconds) was produced at commit `afc0a31f`, and the
 second-corpus (ICSI) validation at commit `126c0a05`. The device-switch and
 shared-profile measurements were produced at commits `6a62b013`, `5fed6281`,
-and `468c3f59`, and the shared-profile follow-ups and diarizer-output check
+and `468c3f59`, with the device-switch row re-measured at `40ddb180`
+(2026-08-28) after a consistency check on first enrollments landed — one of
+the 63 device-switch trials is now refused at enrollment, so that row is
+reported over 62 trials, and the shared-profile follow-ups and diarizer-output check
 at commits `323421b3` and `d1067e57` — production default parameters
 throughout. The voiceprint-evidence rows were produced at commit `dc0bd03d`
 (against `c57c3bec` for the before arm) with
