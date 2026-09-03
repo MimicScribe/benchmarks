@@ -2,7 +2,7 @@
 
 Pipeline: Parakeet TDT 0.6B ASR on CoreML, transcribing in real time from overlapping listening windows.
 
-Run date: 2026-08-29. Corpus: 16 AMI far-field meetings, 8.5 hours, single distant microphone. Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display and latency come from 4 recorded capture sessions, a smaller basis, marked as such.
+Run date: 2026-08-29. Corpus: 16 AMI meetings, 8.5 hours, headset mixdown (every speaker's close-talk microphone summed to one channel). Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display and latency come from 4 recorded capture sessions, a smaller basis, marked as such.
 
 ## Headline numbers
 
@@ -213,12 +213,12 @@ Sampling-based systems cannot claim this, and it is load-bearing for everything 
 
 ## Corpora and caveats
 
-- **[AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)** (CC BY 4.0), 16 meetings, 8.5 hours, far-field single distant microphone, which is the hard condition. Scored against the union of all speaker channels *including* overlapped speech, the hardest fair reading.
+- **[AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)** (CC BY 4.0), 16 meetings, 8.5 hours, the Mix-Headset mixdown: every speaker's close-talk microphone summed to one channel, so overlapped speech is fully present and there is no room reverberation. Scored against the union of all speaker channels *including* overlapped speech, the hardest fair reading.
 - **[Earnings-21](https://github.com/revdotcom/speech-datasets)**, 11 earnings calls with Rev.com human references including punctuation and casing.
 
 Benchmark numbers come from fixed public corpora, not from your meetings. Real meetings vary, and accents, cross-talk, background noise and call-audio quality all change what the recognizer hears in the first place.
 
-Far-field results are not comparable to near-field ones. Blending the two produces a figure that describes neither.
+This is not the far-field condition. A single distant microphone in the same room would score worse, and results on the two are not comparable; an earlier version of this page described the corpus as far-field, which was wrong (corrected 2026-09-03 after hash-matching the audio against the AMI mirror).
 
 The word-accuracy figures above are AMI only. Earnings-21 appears on this page for punctuation and casing, and the two corpora are not aggregated.
 
