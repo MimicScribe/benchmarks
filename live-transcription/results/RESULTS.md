@@ -128,24 +128,33 @@ checked against the session's script as performed.
 | Doubled phrases (4+ words) visible in the live view | **2 episodes** in 32.9 min |
 | Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **4 episodes** |
 | Words shown fused with a fragment of themselves ("Turningning") | **0 episodes** |
-| Words shown that were never spoken | 677 |
-| Spoken words that never appeared on screen | 165 |
-| Already-shown words rewritten under the reader (flicker, case counts) | 591 of 4,938 shown, **12.0 per 100** |
-| Punctuation changed on words that stayed | 410, **8.3 per 100** |
+| Words shown that were never spoken | 664 |
+| Spoken words that never appeared on screen | 162 |
+| Already-shown words rewritten under the reader (flicker, case counts) | 642 of 4,940 shown, **13.0 per 100** |
+| Punctuation changed on words that stayed | 364, **7.4 per 100** |
 | A short repeat ("short short") that reached the saved transcript | 19 |
-| The other speaker's words appearing on this channel's row | 11 episodes, 0 saved (tracked, not gated) |
-| A bare fragment of a word ("ight") on screen | 11 episodes, 7 saved |
+| The other speaker's words appearing on this channel's row | 10 episodes, 0 saved (tracked, not gated) |
+| A bare fragment of a word ("ight") on screen | 12 episodes, 7 saved |
 
-Replayed 2026-09-05 on build `a0c19905`. The flicker rows count what the
+Replayed 2026-09-05 on build `93d9a7d3`. The flicker rows count what the
 reader saw BETWEEN RENDERS, so a display that refreshes faster shows more
 intermediate states and scores higher, and the gate refuses to compare two
 builds at different cadences. This build refreshes on the same 1.5 s floor
-as the last one and reads 12.0 and 8.3 per 100 against 20.1 and 12.2: the
-words at the very edge of the decoded audio, where the decoder changes its
-mind most, now wait for the next refresh before they are shown. On the last
-build a slower 2.5 s refresh read a third lower on both rows; on this one
-it reads higher, so the faster refresh is no longer paid for in flicker.
-The "other speaker's words" row is tracked only: every one of its 11
+as the last two and reads 13.0 and 7.4 per 100 against 13.1 and 7.9 on
+the previous build (and 20.1 and 12.2 two builds ago). What changed on
+this build: the live view now keeps the first spelling it showed for a
+word the normalizer would otherwise re-render with a hyphen in a different
+place ("cost cutting" / "cost-cutting", "mid July" / "mid-July") until the
+word is final — a hyphen never changes what was said, so that class of
+rewrite (68 of the 649 on the last build) is mostly gone (46), and the
+punctuation row fell with it. Sentence casing gained the row-end cases a
+review found missing ("The year was 2016." now ends a sentence for the
+row after it). Two other changes were built, measured on these sessions,
+and NOT shipped: moving backchannel paragraph breaks earlier (measured
+gain 0.8 s median, not the 7 s first estimated) and keeping speaker badges
+across a re-timed row (it removed the "You" badge from every mic row and
+produced a badge that later changed name).
+The "other speaker's words" row is tracked only: every one of its 10
 episodes on this build is two people saying the same two words within a
 second of each other, which row-level timing cannot tell from bleed. The
 bare-fragment row lost the one episode that named it ("ight", on screen
@@ -379,6 +388,32 @@ is solved.
 
 *Basis: 27 files, 18.83 hours, measured at `5b3e5c23` on a ledgered run. This is a different arm from the word-accuracy and punctuation rows above, which is stated here rather than left to provenance; see the provenance table.*
 
+## Invented phrases over silence
+
+The section above scores what the recovery layer adds. It cannot see text the
+decoder itself writes over a stretch of room tone. This row scores that
+directly: runs of three or more words with no reference word at their time,
+over a span more than 25 dB quieter than the meeting's own speech. The energy
+test is what separates a fabricated phrase from a passage the annotators never
+transcribed; on these meetings the latter are nine runs in ten and are not
+counted.
+
+| | previous release | this release |
+|---|---:|---:|
+| Invented phrases over silence, per meeting-hour | 2.00 | **2.23** |
+| Words in them, per meeting-hour | 14.3 | **15.4** |
+| Of them in the last 15 seconds of a file | 2 | **2** |
+
+19 runs over 8.5 hours, one every 27 minutes. A decoder reads something
+into silence at some rate; this row is that rate for the primary decode,
+published beside the recovery layer's so the two are not confused. Before
+this release a window rule on the main branch had raised it to 2.47; the
+fix brought it back to 2.23. The two runs in the last 15 seconds of a file
+come from the final decode of a recording and are pinned on their own.
+
+*Basis: 16 AMI meetings, 8.51 hours, one decode per arm at `7476b3bd0` and at
+the previous release, on its own token-frame arm.*
+
 ## Saved-transcript duplicates
 
 "It repeats itself" is the question users ask about a transcript, so
@@ -511,10 +546,11 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 | Determinism | `5b3e5c23`, decoded twice | 2026-09-02 | 27 files (16 AMI + 11 Earnings-21) |
 | Live display stability | `ecce55f3` | 2026-08-29 | 4 capture sessions, **carried** |
 | Latency to trust | `ecce55f3` | 2026-08-29 | 4 capture sessions, **carried** |
-| Live view against the script | `73bfd2f8` | 2026-09-02 | 7 capture sessions (script rows: 5), debug build |
+| Live view against the script | `93d9a7d3` | 2026-09-05 | 7 capture sessions (script rows: 5), debug build |
 | Numbers in the saved transcript | `5b3e5c23` | 2026-09-02 | 11 Earnings-21 calls (2,857 quantities) |
 | Words the recovery layer adds | `5b3e5c23` | 2026-09-02 | 27 files, 18.83 hours, ledgered run |
 | Hallucinated rows | `5b3e5c23` | 2026-09-02 | the same ledgered run |
+| Invented phrases over silence | `7476b3bd0` (previous release `5c847cf5`) | 2026-09-06 | 16 AMI meetings, 8.51 hours, its own token-frame arm |
 | Wrong figures by magnitude | `5c847cf5` | 2026-08-29 | the previous release's 39 corruptions, split by ratio |
 | Saved-transcript duplicates | `5c847cf5` | 2026-08-29 | 27 files, 18.83 hours |
 | Per-file sign counts | `5b3e5c23` | 2026-09-02 | this page's own pair of arms, 27 files |
@@ -589,13 +625,13 @@ The values the next release is measured against. A pin is not a target; it is th
 | Doubled phrases visible live | regression bar | 2 |
 | Punctuation-identical duplicated spans | regression bar | 4 |
 | Words shown fused with a fragment of themselves | regression bar | 0 |
-| Words shown never spoken | regression bar | 758 |
-| Spoken words never shown | regression bar | 160 |
+| Words shown never spoken | regression bar | 664 |
+| Spoken words never shown | regression bar | 162 |
 | Live text withdrawn and restored | regression bar | 6 episodes |
-| Already-shown words rewritten (flicker), per 100 shown | regression bar, same refresh cadence | 20.1 |
-| Punctuation changed on unchanged words, per 100 shown | regression bar, same refresh cadence | 12.2 |
-| Short repeats reaching the saved transcript | regression bar (7-session sum of rises) | 20 |
-| Other channel's words on this channel's row | tracked (row timing cannot separate bleed from coincidence) | 11 |
+| Already-shown words rewritten (flicker), per 100 shown | regression bar, same refresh cadence | 13.0 |
+| Punctuation changed on unchanged words, per 100 shown | regression bar, same refresh cadence | 7.4 |
+| Short repeats reaching the saved transcript | regression bar (7-session sum of rises) | 19 |
+| Other channel's words on this channel's row | tracked (row timing cannot separate bleed from coincidence) | 10 |
 | Bare word fragments on screen | regression bar | 12 |
 | Spoken quantities rendered as a different quantity | regression bar | 1 |
 | Spoken quantities dropped | regression bar | 7 |
@@ -609,6 +645,9 @@ The values the next release is measured against. A pin is not a target; it is th
 | Hallucinated runs per hour | regression bar | 5.63 |
 | Words in them, per hour | regression bar | 8.98 |
 | Of 3 words or more, per hour | regression bar | 0.85 |
+| Invented phrases over silence, per hour | regression bar | 2.23 |
+| Words in them, per hour | regression bar | 15.4 |
+| Of them in the last 15 seconds of a file | must not rise | 2 |
 | Duplicate spans per hour | tracked | 2.34 |
 | Decodes added to the product path | declared before it ships | none |
 | Determinism | must hold | byte-identical |
@@ -682,6 +721,11 @@ python3 scripts/score_number_fidelity.py --corpus-compare <pinned baseline> chg.
 python3 scripts/seam_ledger_verdicts.py align   --run <A> --cache-dir <cache>
 python3 scripts/seam_ledger_verdicts.py repairs --ledger <dir> --run <A> --cache-dir <cache> \
     --split all --json-out repairs.json
+
+# invented phrases over silence: its own token-frame arm (16 AMI meetings, ~10 min),
+# then the scorer, which also checks the pin (exit 1 = a regression, 2 = not comparable)
+scripts/timestamp_merge_ami16_arm.sh <arm>
+python3 scripts/invented_phrase_runs.py --arm <arm> --gate benchmark/results/live-transcription-public/pins.json
 
 # duplicate spans across a row boundary, and how many the shipped rule removes
 python3 scripts/bakeoff/seam_repeat_false_fire.py --cross-row <A> \
