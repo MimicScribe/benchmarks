@@ -17,6 +17,10 @@ that reads the transcripts against the human reference.
 The answer is that no model dominates, that the model the product ships is the
 balanced arm, and that none of the alternatives is a replacement.
 
+A fifth model, Voxtral Realtime 4B, was probed on a single file after
+publication and is reported separately below. It was not part of the measured
+comparison and its section says so.
+
 ## How to read the numbers on this page
 
 **These error rates are comparisons, not scores.** The AMI reference is the
@@ -272,6 +276,60 @@ reads a domain acronym Parakeet does not.
 The same measurement also covered two Apple on-device transcribers, from a
 separate campaign. They are not published here, because their method is not part
 of this report and a number without its method is not a comparison.
+
+## Voxtral Realtime 4B — a probe, not an arm
+
+Mistral's `Voxtral-Mini-4B-Realtime-2602` (Apache 2.0) is natively streaming: a
+causal encoder and a 3.4B decoder emitting one token per 80 ms frame. It is the
+closest open model to what this product does, and it is missing from the four
+arms above — it was published 2026-02-04, seven months before this report was
+measured, so "dated and closed" does not cover the omission.
+
+**One file.** IS1009a (AMI, 839 s), 4-bit, 480 ms delay, 2026-09-06. No second
+corpus, no judge, no number-fidelity pass; both Parakeet columns were re-scored
+locally on the same binary. Nothing here is comparable to the pooled figures
+above.
+
+Terminal punctuation against AMI's own `punc="true"` annotations, over 1:1
+aligned words. The scorer for this table is not in `scripts/` and has not had
+the review the four scorers on this page have had, so the table is not
+reproducible from this repository:
+
+| arm | coverage | precision | recall | F1 | recall at a speaker change |
+|---|---:|---:|---:|---:|---:|
+| Parakeet v3, FluidAudio batch | 0.765 | **0.783** | 0.834 | 0.808 | 0.853 |
+| Parakeet v3, MimicScribe pipeline | 0.792 | 0.760 | 0.875 | **0.814** | 0.888 |
+| Voxtral Realtime 4-bit | 0.714 | 0.702 | **0.943** | 0.805 | **0.944** |
+
+**It punctuates better than either Parakeet arm** — 94.4% of reference sentence
+ends at a speaker change get a mark, against 85.3% and 88.8% — and pays in
+precision, with 56 marks the reference does not carry against 35 and 42. F1 is a
+three-way tie. Its coverage is also the lowest, so its rates are computed over
+less of the transcript and some of that recall is a selection effect we did not
+separate.
+
+And it drops words. Deletions split by whether another speaker was talking at
+the same instant; the left column is structural for any single-stream decoder,
+the right one is recognition quality:
+
+| arm | deletion, overlapped | deletion, clean speech |
+|---|---:|---:|
+| Parakeet v3, FluidAudio batch | 47.2% | 5.0% |
+| Parakeet v3, MimicScribe pipeline | 39.2% | **2.5%** |
+| Voxtral Realtime 4-bit | 50.1% | **11.3%** |
+
+Against a 1,979-word reference the pipeline writes down 1,777 words, the batch
+path 1,715, and Voxtral 1,548.
+
+No delay sweep was run. The setting trades latency for accuracy, and the model's
+card puts 480 ms within 1-2% of its own batch mode with 2,400 ms at parity — the
+knob's whole range is smaller than the gap it would need to close. Its published
+AMI figure, 15.05%, sits above Parakeet v3's 11.31% on the same leaderboard.
+
+**Not a replacement, for the opposite reason to the others.** Cohere and Granite
+say less and lose on the words. Voxtral marks up sentences better than what ships
+and recognizes meaningfully less of them — and the punctuation exists to serve
+speaker attribution, which needs the words to be there first.
 
 ## Why the verbatim rate overstates the gaps
 
@@ -727,6 +785,7 @@ two scorers on the same basis. The number-fidelity table was re-scored on
 | NeMo v3 | `nvidia/parakeet-tdt-0.6b-v3` | `541d1f99` | 2025-08-04 | NVIDIA NeMo 2.5.0, CPU |
 | Cohere Transcribe 03-2026 (2B) | `evewashere/cohere-transcribe-03-2026-ungated` | `29b9036c` | 2026-03-24, mirror 2026-07-21 | MPS, float16 |
 | Granite Speech 4.1-2b | `ibm-granite/granite-speech-4.1-2b` | `de575db6` | 2026-04-16 | MPS, bfloat16 |
+| Voxtral Realtime 4B (probe, 1 file, 2026-09-06) | `mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit` | 4-bit, 480 ms delay | 2026-02-04 | MLX on Apple Silicon GPU |
 
 Both CoreML encoder files come from `FluidInference/parakeet-tdt-0.6b-v3-coreml`.
 The rebuilt int8 encoder the product ships has `weights/weight.bin` SHA-256
