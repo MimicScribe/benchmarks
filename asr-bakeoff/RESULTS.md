@@ -17,9 +17,9 @@ that reads the transcripts against the human reference.
 The answer is that no model dominates, that the model the product ships is the
 balanced arm, and that none of the alternatives is a replacement.
 
-A fifth model, Voxtral Realtime 4B, was probed on a single file after
-publication and is reported separately below. It was not part of the measured
-comparison and its section says so.
+Two streaming models, Voxtral Realtime 4B and Moonshine Streaming Medium, were
+probed on a single file after publication and are reported separately below.
+Neither was part of the measured comparison and their section says so.
 
 ## How to read the numbers on this page
 
@@ -215,11 +215,13 @@ the fix: the global probe below used a shorter n-gram than the six-chunk patch
 (3 against 5), and it cost 2.4 points on clean speech.
 
 **The whole gap is deletion.** Against the shipping pipeline the patched run deletes
-12,552 more reference words while substituting 2,013 fewer and inserting 1,782 fewer,
-and it is worse on 26 of the 27 files (median +5.1 points). Part of that is
+12,552 more reference words while substituting 2,014 fewer and inserting 1,782 fewer,
+and it is worse on 26 of the 27 files (median +5.0 points). Part of that is
 that it is a non-verbatim transcriber scored against a verbatim reference —
 9,134 filled-pause deletions against 4,372 — and part of it is not: it also
-drops ordinary words, "the" 610 more times, "you" 588, "know" 399.
+drops ordinary words, "the" 610 more times, "you" 588, "know" 399. Those word
+counts are from the vendor-default run; the patched run's are within five of
+each.
 
 **Contamination, checked.** The card names no training sets, and 11 of our 16
 AMI files sit in AMI's public train split. The train files and the five
@@ -277,59 +279,104 @@ The same measurement also covered two Apple on-device transcribers, from a
 separate campaign. They are not published here, because their method is not part
 of this report and a number without its method is not a comparison.
 
-## Voxtral Realtime 4B — a probe, not an arm
+## Two streaming models — probes, not arms
 
-Mistral's `Voxtral-Mini-4B-Realtime-2602` (Apache 2.0) is natively streaming: a
-causal encoder and a 3.4B decoder emitting one token per 80 ms frame. It is the
-closest open model to what this product does, and it is missing from the four
-arms above — it was published 2026-02-04, seven months before this report was
-measured, so "dated and closed" does not cover the omission.
+Neither model below is one of the four arms above. Each was run on one file
+after publication, and nothing here is comparable to the pooled figures.
 
-**One file.** IS1009a (AMI, 839 s), 4-bit, 480 ms delay, 2026-09-06. No second
-corpus, no judge, no number-fidelity pass; both Parakeet columns were re-scored
-locally on the same binary. Nothing here is comparable to the pooled figures
-above.
+**Voxtral Realtime 4B.** Mistral's `Voxtral-Mini-4B-Realtime-2602` (Apache
+2.0) is natively streaming: a causal encoder and a 3.4B decoder emitting one
+token per 80 ms frame. It was published 2026-02-04, seven months before this
+report was measured, so "dated and closed" does not cover its omission. Run
+4-bit at a 480 ms delay on 2026-09-06, with an fp16 control on 2026-09-07.
+
+**Moonshine Streaming Medium.** Moonshine's `moonshine-streaming-medium` (245M,
+English only, MIT) streams with a sliding-window encoder. It sat close to
+Parakeet v3 on an earlier version of the Open ASR Leaderboard, ahead on AMI
+(10.68 against 11.39 in that version) and behind on the average. The current
+version no longer lists it. Run 2026-09-21 through the vendor's own
+`moonshine-voice` runtime (0.1.5), CPU only, fed in 200 ms chunks. That runtime
+ships a quantized build, while the leaderboard scored the published weights; we
+did not run a full-precision control, so part of any gap to the leaderboard may
+be the quantization.
+
+**The file.** IS1009a (AMI, 839 s). No second corpus, no judge, no
+number-fidelity pass. Every column below was scored in one run of each scorer
+on one binary, with `MIMICSCRIBE_ITN_NUMBERS=1` (see Reproducing).
 
 Terminal punctuation against AMI's own `punc="true"` annotations, over 1:1
-aligned words. The scorer for this table is not in `scripts/` and has not had
-the review the four scorers on this page have had, so the table is not
-reproducible from this repository:
+aligned words. The scorer is `scripts/bakeoff/ami_punctuation_accuracy.py`; it
+is newer than the four scorers above and has had less review:
 
-| arm | coverage | precision | recall | F1 | recall at a speaker change |
-|---|---:|---:|---:|---:|---:|
-| Parakeet v3, FluidAudio batch | 0.765 | **0.783** | 0.834 | 0.808 | 0.853 |
-| Parakeet v3, MimicScribe pipeline | 0.792 | 0.760 | 0.875 | **0.814** | 0.888 |
-| Voxtral Realtime 4-bit | 0.714 | 0.702 | **0.943** | 0.805 | **0.944** |
+| arm | coverage | precision | recall | F1 | recall at a speaker change | extra marks |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet v3, FluidAudio batch | 0.765 | **0.783** | 0.834 | 0.808 | 0.853 | 35 |
+| Parakeet v3, MimicScribe pipeline | 0.792 | 0.760 | 0.875 | **0.814** | 0.888 | 42 |
+| Voxtral Realtime 4-bit | 0.714 | 0.702 | **0.943** | 0.805 | **0.944** | 56 |
+| Moonshine Streaming Medium | 0.736 | 0.600 | 0.684 | 0.639 | 0.719 | 62 |
 
-**It punctuates better than either Parakeet arm** — 94.4% of reference sentence
-ends at a speaker change get a mark, against 85.3% and 88.8% — and pays in
-precision, with 56 marks the reference does not carry against 35 and 42. F1 is a
-three-way tie. Its coverage is also the lowest, so its rates are computed over
-less of the transcript and some of that recall is a selection effect we did not
-separate.
+**Voxtral punctuates better than either Parakeet arm.** 94.4% of reference
+sentence ends at a speaker change get a mark, against 85.3% and 88.8%, and it
+pays in precision. Its coverage is the lowest, so part of that recall may be a
+selection effect we did not separate. **Moonshine punctuates worst of the
+four**, on every column but coverage. Its output comes in lines, and a line
+break might be read as a sentence end the text does not mark. It does not
+explain the gap: 17 of the 25 sentence ends it misses at a speaker change fall
+inside a line, and counting every line break as a mark only lifts it to 0.809,
+still below both Parakeet arms.
 
-And it drops words. Deletions split by whether another speaker was talking at
-the same instant; the left column is structural for any single-stream decoder,
-the right one is recognition quality:
+Deletions, split by whether another speaker was talking at the same instant.
+The overlapped column is structural for any single-stream decoder; the clean
+column is recognition quality:
 
-| arm | deletion, overlapped | deletion, clean speech |
-|---|---:|---:|
-| Parakeet v3, FluidAudio batch | 47.2% | 5.0% |
-| Parakeet v3, MimicScribe pipeline | 39.2% | **2.5%** |
-| Voxtral Realtime 4-bit | 50.1% | **11.3%** |
+| arm | deletion, overlapped | deletion, clean speech | clean, fillers and backchannels removed | WER, fillers and backchannels removed |
+|---|---:|---:|---:|---:|
+| Parakeet v3, FluidAudio batch | 47.2% | 5.0% | 4.5% | 21.8% |
+| Parakeet v3, MimicScribe pipeline | 39.2% | **2.7%** | **2.5%** | **17.7%** |
+| Voxtral Realtime 4-bit | 50.1% | 11.4% | 7.1% | 19.8% |
+| Voxtral Realtime fp16 | 49.2% | 11.2% | 6.8% | 19.5% |
+| Moonshine Streaming Medium | 48.2% | 7.0% | 5.2% | 23.1% |
 
-Against a 1,979-word reference the pipeline writes down 1,777 words, the batch
-path 1,715, and Voxtral 1,548.
+The two right-hand columns remove the scorer's filler and backchannel list
+("yeah", "mm", "uh", "okay" and similar) from both the reference and the
+transcript before aligning, with `scripts/bakeoff/backchannel_stripped_deletion.py`.
+They exist because the raw clean-speech column mixes a transcription
+convention with real loss: fillers and backchannels are 42% of Voxtral's
+clean-speech deletions, 30% of Moonshine's and 22–27% of Parakeet's. With
+them removed, Voxtral's content loss is 2.8 times the pipeline's rather than
+4.2 times, and its word error rate lands between the two Parakeet arms.
+Moonshine's content loss is close to the batch path's, 66 words against 57 of
+1,273, and twice the pipeline's.
 
-No delay sweep was run. The setting trades latency for accuracy, and the model's
-card puts 480 ms within 1-2% of its own batch mode with 2,400 ms at parity — the
-knob's whole range is smaller than the gap it would need to close. Its published
-AMI figure, 15.05%, sits above Parakeet v3's 11.31% on the same leaderboard.
+Against a 1,981-word reference the pipeline writes down 1,786 words, the batch
+path 1,719, Moonshine 1,686 and Voxtral 1,549. fp16 against 4-bit moved
+Voxtral by 8 words, so the shortfall is the model, not the compression.
 
-**Not a replacement, for the opposite reason to the others.** Cohere and Granite
-say less and lose on the words. Voxtral marks up sentences better than what ships
-and recognizes meaningfully less of them — and the punctuation exists to serve
-speaker attribution, which needs the words to be there first.
+No delay sweep was run for Voxtral. The model's card puts 480 ms within 1-2% of
+its own batch mode, with 2,400 ms at parity, so the setting's whole range is
+smaller than the gap it would need to close. Its published AMI figure, 15.05%,
+sits above Parakeet v3's 11.31% on the same leaderboard. Moonshine at a 500 ms
+chunk size on a 4.3-minute slice of the same file lost 6.3% of clean speech,
+against 7.1% at 200 ms, so chunk size is not what holds it back.
+
+**How Moonshine runs.** It does not run on the Neural Engine. The runtime can
+hand ONNX Runtime a Core ML provider, but on this build the first decode fails
+every time: the streaming decoder starts from an empty cache, and the Core ML
+provider rejects a zero-length input. On CPU, one stream ran at 1.41 times
+real time, kept 2.25 cores busy and peaked at 2.6 GB. A meeting is two streams,
+microphone and system audio. Its line timestamps are usable. Its word
+timestamps are not: 7.9% end before they start and 55% repeat the previous
+word's start. The model card warns it can hallucinate and repeat phrases on
+short or noisy segments; this file produced no repetition loops. It is English
+only.
+
+**Neither is a replacement, for different reasons.** Cohere and Granite say
+less and lose on the words. Voxtral marks up sentences better than what ships
+and recognizes less of them, and the punctuation exists to serve speaker
+attribution, which needs the words to be there first. Moonshine loses on
+sentence ends, which are the one thing speaker attribution cannot do without,
+loses on words to the pipeline, and would add a CPU-bound engine alongside the
+Neural Engine one for English only.
 
 ## Why the verbatim rate overstates the gaps
 
@@ -466,6 +513,13 @@ know what a leak in this kind of instrument looks like.
    error rate against the window — more errors than the window has words means
    the excerpt is not of that window — and drops all 12 before any mean is taken.
    The tables below are the 68 windows every arm was really anchored into.
+   The failures are not spread evenly: Parakeet v2 is one of the unanchored arms
+   in 10 of the 12 windows, Cohere in 7, the FluidAudio v3 batch arm in 5 and the
+   pipeline in 2. The drop is still right — those excerpts are text from another
+   part of the meeting — but it means v2's judge figures come only from windows
+   where it could be anchored. With all 80 windows kept, v2's dropped-content mean
+   rises from 0.55 to 0.93 under the first judge and from 1.41 to 4.03 under the
+   second, where it falls to last.
 
 **Two other things changed with run 4, and neither is a defect in the judge.**
 Every arm's rows now go through the same number-and-acronym normalizer before
@@ -635,6 +689,22 @@ two scorers and the judge read the references from there, and the scorers find
 the app binary through `MIMICSCRIBE_BIN` (the released app's
 `Contents/MacOS/mimicscribe`), which they call only for its text normalizer.
 
+**Set `MIMICSCRIBE_ITN_NUMBERS=1` for every command below.** From v1.0.0-rc.29
+the app keeps spoken numbers as words in the saved transcript, and that includes
+`--itn-text`, the normalizer both scorers call. Without the variable, numbers are
+never put on one basis, and the WER and number tables come out wrong without
+any error: pooled WER for the FluidAudio v3 int8-v2 batch arm reads about 18%
+instead of 16.37%. The WER scorer caches normalized text by binary, not by
+environment, so delete `./cache/itn_text` if you ran it once without the variable. The pipeline arm
+was measured on v1.0.0-rc.27 (app `5c847cf5`); a later release decodes
+differently, so a re-decode with the current app is a new measurement, not a
+reproduction of that row. The raw-row arms' number figures also move with the
+normalizer version, as the Numbers section says.
+
+```bash
+export MIMICSCRIBE_ITN_NUMBERS=1
+```
+
 ```bash
 # 1. Corpus. No audio is redistributed; this fetches every file from its
 #    publisher and verifies it by hash. Standard library only: no build, no
@@ -751,7 +821,8 @@ python3 scripts/bakeoff/judge_transcripts.py \
 # Agreement, position effect, cap counts, and the anchor check that drops a
 # window where any arm's excerpt is not the same stretch of the meeting.
 python3 scripts/bakeoff/judge_agreement.py \
-  --run-a judge_gemini/grades.jsonl --run-b judge_haiku/grades.jsonl --max-anchor-wer 1.0
+  --run-a judge_gemini/grades.jsonl --run-b judge_haiku/grades.jsonl --max-anchor-wer 1.0 \
+  --out judge_agreement.json
 ```
 
 ```bash
@@ -761,6 +832,18 @@ python3 scripts/bakeoff/judge_agreement.py \
 #     Row text out, one line per row, then back into the same JSON shape.
 MIMICSCRIBE_DATA_DIR=./sandbox /Applications/MimicScribe.app/Contents/MacOS/mimicscribe \
   --itn-text --in <rows.txt> --out <rows.itn.txt>
+```
+
+```bash
+# 8. The two streaming probes, IS1009a only. The probe runners are internal;
+#    these are the scorers, run over one directory per arm, each holding
+#    per-file/IS1009a_after_orphan.json.
+python3 scripts/score_corpus_wer.py --arms <batch> <pipeline> <voxtral> <moonshine> \
+  --labels batch pipeline voxtral moonshine --stratify
+python3 scripts/bakeoff/ami_punctuation_accuracy.py \
+  <batch> <pipeline> <voxtral> <moonshine> --files IS1009a
+python3 scripts/bakeoff/backchannel_stripped_deletion.py --file IS1009a \
+  --arms batch=<dir> pipeline=<dir> voxtral=<dir> moonshine=<dir>
 ```
 
 Pin the output directory of each arm explicitly. The scorers default to the
@@ -786,6 +869,7 @@ two scorers on the same basis. The number-fidelity table was re-scored on
 | Cohere Transcribe 03-2026 (2B) | `evewashere/cohere-transcribe-03-2026-ungated` | `29b9036c` | 2026-03-24, mirror 2026-07-21 | MPS, float16 |
 | Granite Speech 4.1-2b | `ibm-granite/granite-speech-4.1-2b` | `de575db6` | 2026-04-16 | MPS, bfloat16 |
 | Voxtral Realtime 4B (probe, 1 file, 2026-09-06) | `mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit` | 4-bit, 480 ms delay | 2026-02-04 | MLX on Apple Silicon GPU |
+| Moonshine Streaming Medium (probe, 1 file, 2026-09-21) | `moonshine-ai/moonshine-streaming-medium`, vendor build `quantized_26_08_21` | vendor download, not the Hugging Face weights; `moonshine-voice` 0.1.5, 200 ms chunks | 2026-01-06 | ONNX Runtime 1.23.2, CPU |
 
 Both CoreML encoder files come from `FluidInference/parakeet-tdt-0.6b-v3-coreml`.
 The rebuilt int8 encoder the product ships has `weights/weight.bin` SHA-256
