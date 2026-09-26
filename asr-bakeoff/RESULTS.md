@@ -17,6 +17,10 @@ that reads the transcripts against the human reference.
 The answer is that no model dominates, that the model the product ships is the
 balanced arm, and that none of the alternatives is a replacement.
 
+A fifth arm, Parakeet Unified 0.6B, a model built for live transcription, was
+decoded over the same 27 files on 2026-09-25 and has its own section. Nothing
+already on this page was re-decoded for it.
+
 Two streaming models, Voxtral Realtime 4B and Moonshine Streaming Medium, were
 probed on a single file after publication and are reported separately below.
 Neither was part of the measured comparison and their section says so.
@@ -279,10 +283,68 @@ The same measurement also covered two Apple on-device transcribers, from a
 separate campaign. They are not published here, because their method is not part
 of this report and a number without its method is not a comparison.
 
+## Parakeet Unified 0.6B
+
+Added 2026-09-25. NVIDIA's `parakeet-unified-en-0.6b` is English only and is
+trained to run either as a stream or over a whole file with one set of
+weights. It was run the way a live caller would run it: through FluidAudio's
+streaming manager at its 1,120 ms latency setting (the setting with the best
+streaming error rate in that runtime's own benchmark), int8 encoder on the
+Neural Engine, fed 160 ms of audio at a time.
+
+27 files, pooled:
+
+| arm | hypothesis words | error rate | sub | del | ins |
+|---|---:|---:|---:|---:|---:|
+| Parakeet v3 int8-v2, FluidAudio batch (the comparator) | 168,105 | 16.37% | 8,518 | 15,671 | 5,073 |
+| Parakeet v3 int8-v2, MimicScribe pipeline | 170,401 | 15.46% | 8,797 | 13,563 | 5,261 |
+| **Parakeet Unified 0.6B, streaming** | 156,463 | **19.15%** | 6,369 | 25,052 | 2,809 |
+
+Per corpus, AMI 25.69% (2,238 / 16,713 / 1,911) against the comparator's
+25.57%, and Earnings-21 13.71% (4,131 / 8,339 / 898) against 8.71%.
+
+**The whole gap is deletion, and it sits in the earnings calls.** Against the
+comparator it deletes 9,381 more reference words while substituting 2,149
+fewer and inserting 2,264 fewer. On the meetings it is level with the
+comparator; on the earnings calls it is 5 points behind. Like Cohere, it writes
+a tidier transcript than was spoken: filled pauses, repeated words and false
+starts are left out, and in back-and-forth conversation long stretches go
+unpunctuated.
+
+**Streaming is not what costs it.** The same model has an offline path that
+reads each stretch of audio with full context in both directions. Run that way
+on two files, it lands within 0.6 points of the stream:
+
+| file | streaming | offline | Parakeet v3, MimicScribe pipeline |
+|---|---:|---:|---:|
+| IS1009a (AMI) | 26.50% | 25.95% | 21.81% |
+| 4320211 (Earnings-21) | 10.08% | 10.13% | 7.46% |
+
+This is a control on two files, not a second arm. Four files of the streaming
+arm were decoded twice and came out byte-identical both times.
+
+**Numbers:** 2,685 of 2,840 scored quantities intact, 51 wrong, 104 dropped, 84
+never said, 6 doubled or spliced. These were scored with the published scorer
+on a later build of the normalizer than the Numbers table below, so they are
+not in that table. Re-scoring the v3 batch comparator on the same build reads
+2,745 intact against its published 2,749, which bounds how much the build
+moves a row.
+
+On the one meeting every model decoded, it marks the fewest sentence ends of
+any arm (see the next section): 20% of the sentence ends at a speaker change,
+and almost none it should not.
+
+**Verdict: not a replacement.** It deletes more than the model the product
+ships, in both of its own modes on the files tried, and its punctuation is too
+sparse to split speakers on.
+
 ## Two streaming models — probes, not arms
 
-Neither model below is one of the four arms above. Each was run on one file
-after publication, and nothing here is comparable to the pooled figures.
+Neither model below is one of the arms above. Each was run on one file after
+publication, and nothing here is comparable to the pooled figures. So that the
+probes can be read against every model, the two tables below also carry each
+arm's own decode of the same file, added 2026-09-25; those rows are one file
+too.
 
 **Voxtral Realtime 4B.** Mistral's `Voxtral-Mini-4B-Realtime-2602` (Apache
 2.0) is natively streaming: a causal encoder and a 3.4B decoder emitting one
@@ -302,7 +364,9 @@ be the quantization.
 
 **The file.** IS1009a (AMI, 839 s). No second corpus, no judge, no
 number-fidelity pass. Every column below was scored in one run of each scorer
-on one binary, with `MIMICSCRIBE_ITN_NUMBERS=1` (see Reproducing).
+on one binary, with `MIMICSCRIBE_ITN_NUMBERS=1` (see Reproducing). The rows added
+on 2026-09-25 were scored in a later run on a later binary; that run re-scored
+the first four rows as well and reproduced every cell.
 
 Terminal punctuation against AMI's own `punc="true"` annotations, over 1:1
 aligned words. The scorer is `scripts/bakeoff/ami_punctuation_accuracy.py`; it
@@ -314,16 +378,25 @@ is newer than the four scorers above and has had less review:
 | Parakeet v3, MimicScribe pipeline | 0.792 | 0.760 | 0.875 | **0.814** | 0.888 | 42 |
 | Voxtral Realtime 4-bit | 0.714 | 0.702 | **0.943** | 0.805 | **0.944** | 56 |
 | Moonshine Streaming Medium | 0.736 | 0.600 | 0.684 | 0.639 | 0.719 | 62 |
+| Cohere Transcribe | 0.721 | 0.704 | 0.856 | 0.773 | 0.889 | 50 |
+| Parakeet v3, NVIDIA NeMo | 0.766 | 0.758 | 0.844 | 0.799 | 0.876 | 38 |
+| Parakeet v2, FluidAudio batch | 0.749 | 0.778 | 0.829 | 0.803 | 0.888 | 33 |
+| Parakeet Unified 0.6B, streaming | 0.739 | **0.947** | 0.137 | 0.240 | 0.198 | 1 |
 
 **Voxtral punctuates better than either Parakeet arm.** 94.4% of reference
 sentence ends at a speaker change get a mark, against 85.3% and 88.8%, and it
 pays in precision. Its coverage is the lowest, so part of that recall may be a
 selection effect we did not separate. **Moonshine punctuates worst of the
-four**, on every column but coverage. Its output comes in lines, and a line
+first four rows**, on every column but coverage. Its output comes in lines, and a line
 break might be read as a sentence end the text does not mark. It does not
 explain the gap: 17 of the 25 sentence ends it misses at a speaker change fall
 inside a line, and counting every line break as a mark only lifts it to 0.809,
 still below both Parakeet arms.
+
+**Parakeet Unified marks the fewest sentence ends of any row**: 20% of those at
+a speaker change, against 72% for Moonshine and 85–94% for everything else. The
+marks it does make are almost all right, which is why its precision is the
+highest here and its recall the lowest.
 
 Deletions, split by whether another speaker was talking at the same instant.
 The overlapped column is structural for any single-stream decoder; the clean
@@ -336,20 +409,27 @@ column is recognition quality:
 | Voxtral Realtime 4-bit | 50.1% | 11.4% | 7.1% | 19.8% |
 | Voxtral Realtime fp16 | 49.2% | 11.2% | 6.8% | 19.5% |
 | Moonshine Streaming Medium | 48.2% | 7.0% | 5.2% | 23.1% |
+| Cohere Transcribe | 48.7% | 11.1% | 6.1% | 20.8% |
+| Parakeet v3, NVIDIA NeMo | 45.4% | 3.9% | 3.2% | 18.4% |
+| Parakeet v2, FluidAudio batch | 47.7% | 6.5% | 3.7% | 18.8% |
+| Parakeet Unified 0.6B, streaming | 53.3% | 6.7% | 3.9% | 20.2% |
 
 The two right-hand columns remove the scorer's filler and backchannel list
 ("yeah", "mm", "uh", "okay" and similar) from both the reference and the
 transcript before aligning, with `scripts/bakeoff/backchannel_stripped_deletion.py`.
 They exist because the raw clean-speech column mixes a transcription
 convention with real loss: fillers and backchannels are 42% of Voxtral's
-clean-speech deletions, 30% of Moonshine's and 22–27% of Parakeet's. With
+clean-speech deletions, 30% of Moonshine's and 22–27% of the two Parakeet v3
+arms' in the first rows (Cohere 48%, Parakeet v2 48%, Parakeet Unified 45%,
+NeMo 33%). With
 them removed, Voxtral's content loss is 2.8 times the pipeline's rather than
 4.2 times, and its word error rate lands between the two Parakeet arms.
 Moonshine's content loss is close to the batch path's, 66 words against 57 of
 1,273, and twice the pipeline's.
 
 Against a 1,981-word reference the pipeline writes down 1,786 words, the batch
-path 1,719, Moonshine 1,686 and Voxtral 1,549. fp16 against 4-bit moved
+path 1,719, NeMo 1,709, Moonshine 1,686, Parakeet v2 1,666, Parakeet Unified
+1,627, Cohere 1,595 and Voxtral 1,549. fp16 against 4-bit moved
 Voxtral by 8 words, so the shortfall is the model, not the compression.
 
 No delay sweep was run for Voxtral. The model's card puts 480 ms within 1-2% of
@@ -747,6 +827,21 @@ swift run --package-path scripts/parakeet_version_probe parakeet_version_probe \
   --audio <file.wav> [--audio <file.wav> ...]
 ```
 
+```bash
+# 3b. Parakeet Unified, streaming at the 1,120 ms setting. The models directory
+#     holds FluidInference/parakeet-unified-en-0.6b-coreml; the runner never
+#     downloads, so a missing encoder fails loudly. --offline runs the model's
+#     own offline path instead, which is how the two-file control was made.
+swift run --package-path scripts/parakeet_version_probe unified_probe \
+  --arm unified-1120 --tier 1120 --models-dir <model directory> \
+  --out benchmark/output/bakeoff-unified-1120 \
+  --audio <file.wav> [--audio <file.wav> ...]
+```
+
+The runner stops if the words it writes out differ from the model's own
+transcript, retries a file whose decode a CoreML timeout interrupted, and keeps
+files an earlier interrupted run already finished.
+
 The probe package pins the same FluidAudio fork revision the app pins
 (`MimicScribe/FluidAudio` @ `3c2cd9c2…`, the sha in the Provenance table), by
 URL, so `swift run` resolves it on any machine with network access.
@@ -854,7 +949,10 @@ since.
 
 Every arm decoded and scored on 2026-09-01, on the same 27 files, by the same
 two scorers on the same basis. The number-fidelity table was re-scored on
-2026-09-03, on one binary; that section says so and carries the caveat.
+2026-09-03, on one binary; that section says so and carries the caveat. The
+Parakeet Unified arm was decoded and scored on 2026-09-25 by the scorers in
+this directory, on a later build of the normalizer; its section says what that
+moves.
 
 **Published** is the date the model's Hugging Face repository was created.
 
@@ -869,6 +967,7 @@ two scorers on the same basis. The number-fidelity table was re-scored on
 | Cohere Transcribe 03-2026 (2B) | `evewashere/cohere-transcribe-03-2026-ungated` | `29b9036c` | 2026-03-24, mirror 2026-07-21 | MPS, float16 |
 | Granite Speech 4.1-2b | `ibm-granite/granite-speech-4.1-2b` | `de575db6` | 2026-04-16 | MPS, bfloat16 |
 | Voxtral Realtime 4B (probe, 1 file, 2026-09-06) | `mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit` | 4-bit, 480 ms delay | 2026-02-04 | MLX on Apple Silicon GPU |
+| Parakeet Unified 0.6B (arm, 27 files, 2026-09-25) | `nvidia/parakeet-unified-en-0.6b` via `FluidInference/parakeet-unified-en-0.6b-coreml`, int8 | streaming encoder `70_7_7` weights `f145c8da…`, offline encoder `f984b815…`; FluidAudio same | 2026-04-07 | CoreML on Apple Silicon, `StreamingUnifiedAsrManager`, 1,120 ms |
 | Moonshine Streaming Medium (probe, 1 file, 2026-09-21) | `moonshine-ai/moonshine-streaming-medium`, vendor build `quantized_26_08_21` | vendor download, not the Hugging Face weights; `moonshine-voice` 0.1.5, 200 ms chunks | 2026-01-06 | ONNX Runtime 1.23.2, CPU |
 
 Both CoreML encoder files come from `FluidInference/parakeet-tdt-0.6b-v3-coreml`.
@@ -891,7 +990,8 @@ resolved.
 Arm output directories (not redistributed; each holds one JSON of per-file
 transcripts): `benchmark/output/bakeoff-<arm>/per-file/`, the patched Cohere
 run at `benchmark/output/audit-cohere-loopfix`, the NeMo arms at
-`benchmark/output/bakeoff-nemo-{v2,v3}`. The MimicScribe pipeline arm is
+`benchmark/output/bakeoff-nemo-{v2,v3}`, the Parakeet Unified arm at
+`benchmark/output/bakeoff-unified-1120`. The MimicScribe pipeline arm is
 `benchmark/output/swift_pipeline_2026-08-30T021253Z`, decoded by app commit
 `5c847cf5`, which shipped as v1.0.0-rc.27.
 

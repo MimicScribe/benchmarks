@@ -26,6 +26,12 @@ let package = Package(
             name: "parakeet_version_probe",
             dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
             path: "Sources/parakeet_version_probe"
-        )
+        ),
+        // Parakeet Unified streaming arm (same pinned FluidAudio).
+        .executableTarget(
+            name: "unified_probe",
+            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
+            path: "Sources/unified_probe"
+        ),
     ]
 )
