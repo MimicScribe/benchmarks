@@ -132,6 +132,30 @@ _NUMWORD_ALT = "|".join(sorted(TEXT_NUMBERS, key=len, reverse=True))
 _SCALE_ALT = "|".join(sorted(SCALES, key=len, reverse=True))
 _FRAC_ALT = "|".join(sorted(FRACTIONS, key=len, reverse=True))
 
+# A 12-hour clock hour, spoken. Deliberately 1-12 only — that range is what
+# keeps "fourteen fifteen students" out of the TIME reading: 14 is not a
+# valid 12-hour hour, so the clock branch below never fires for it and the
+# ordinary spoken-number addition runs instead (see `parse_spoken_number_value`).
+_HOUR_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight",
+               "nine", "ten", "eleven", "twelve")
+_HOUR_WORD_ALT = "|".join(sorted(_HOUR_WORDS, key=len, reverse=True))
+_TEEN_WORDS = ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+               "sixteen", "seventeen", "eighteen", "nineteen")
+_TEEN_ALT = "|".join(sorted(_TEEN_WORDS, key=len, reverse=True))
+_MINUTE_TENS_ALT = "twenty|thirty|forty|fifty"
+_ONES_ALT = "one|two|three|four|five|six|seven|eight|nine"
+# A spoken minute: a teen ("fifteen" = :15) or a round or compound tens
+# ("thirty" = :30, "forty three" / "forty-three" = :43). Never 60+ -- a
+# minute can't be. Deliberately NO "oh" + digit reading ("oh five" = :05):
+# that shape collides with an ordinary digit-string readout ("four oh three
+# five five five" is a phone number, not 4:03 followed by three more digits)
+# and no golden-pair render needs it -- adding it broke an existing
+# self-check case (2026-09-08).
+_MINUTE_WORD = (
+    rf"(?:{_TEEN_ALT})"
+    rf"|(?:{_MINUTE_TENS_ALT})(?:[\s\-]+(?:{_ONES_ALT}))?"
+)
+
 # A spoken number phrase. Deliberately does NOT admit a bare \d+ as a
 # continuation: "twenty 2018" must surface as a SPLICE DEFECT, not silently
 # canonicalize to 2038, and admitting digits also let "$5.4 million and 140
@@ -167,6 +191,14 @@ NUMBER_ENTITY_RE = re.compile(
       (?P<curr_sym>[\$€£])\s*(?P<curr_val>\d+(?:,\d{{3}})*(?:\.\d+)?)
         (?:\s*(?P<curr_scale>{_SCALE_ALT})\b)?
       |
+      # Formatted clock time: 4:15, 11:59, 12:15 -- ONE entity. Without this
+      # a colon clock shreds into two CARDINALs (`4` + `15`), charging a
+      # CORRECT render both a corruption and a drop for a value it got right
+      # (2026-09-08; the two clock-time golden pairs exist to probe exactly
+      # this and could not be read until it was fixed).
+      \b(?P<time_digit_h>0?[1-9]|1[0-2]):(?P<time_digit_m>[0-5]\d)\b
+        (?:\s*(?P<time_digit_ap>[AaPp]\.?[Mm]\.?))?
+      |
       # Mixed fractions, spoken or written: "five and five eighths percent",
       # "5 5/8%" — a bond coupon; read as 10 by the spoken-number branch before
       # (2026-08-27, 4359971). Only the eighths/quarters/halves family.
@@ -190,6 +222,21 @@ NUMBER_ENTITY_RE = re.compile(
       \b(?P<ord_digit>\d{{1,2}})(?:st|nd|rd|th)\b
       |
       \b(?P<ord_word>{"|".join(sorted(ORDINALS, key=len, reverse=True))})\b
+      |
+      # Spoken clock time: "four fifteen" (4:15), "eleven fifty-nine" (11:59),
+      # "twelve fifteen" (12:15). Tried BEFORE the general spoken-number
+      # branch below, which would otherwise consume the same words as a
+      # plain addition. The trailing lookahead defers to that ordinary
+      # reading when a scale/currency/unit word terminates the run, even a
+      # few number-words further out -- "one twenty five million" stays
+      # $125,000,000, not a clock with "five million" orphaned beside it. A
+      # lookahead anchored only on the immediate next word is NOT enough
+      # here: Python's `re` backtracks the optional ones-suffix in the
+      # minute group, and a bare "twenty" (with "five million" left over)
+      # passes an immediate check that "twenty five million" as a whole
+      # correctly fails (measured 2026-09-08 -- `--self-check` caught it).
+      \b(?P<time_word_h>{_HOUR_WORD_ALT})[\s\-]+(?P<time_word_m>{_MINUTE_WORD})\b
+        (?!(?:[\s\-]+(?:and[\s\-]+)?(?:{_NUMWORD_ALT})){{0,4}}[\s\-]+(?:{_SCALE_ALT}|{_UNIT})\b)
       |
       # Spoken phrases: "twenty one percent", "one hundred and fifteen million
       # dollars", "three and a half million", "twenty twenty"
@@ -240,8 +287,23 @@ _ALNUM_HYPHEN_RE = re.compile(
 # Case-SENSITIVE stem, case-INSENSITIVE number word, so `COVID Nineteen` at a
 # sentence start masks like `COVID nineteen`. The stem stays all-caps because
 # a title-case stem would swallow "The nineteen people".
+#
+# The whole spoken run is masked, not its first word: a verbalized code reads
+# "ADX twenty one ninety one" (ADX 2191), and masking only "ADX twenty" left
+# "one ninety one" to score as a corrupted 2191 (2026-09-26). ISO currency
+# codes are NOT stems: "EUR three point zero eight billion" is an amount, and
+# masking "EUR three" left "zero eight billion" to score as an 8e9 corruption.
+_CURRENCY_CODES = "EUR|USD|GBP|JPY|CAD|AUD|CHF|CNY|INR|BRL|MXN|SEK|NOK|DKK"
+#
+# Nor is a QUANTITY after an acronym a code: "EPS twenty one cents", "GDP three
+# percent" — the run followed (after any further number words, so a shorter
+# backtracked run cannot sneak past) by a scale, unit or "point" is left to be
+# scored. Masking it hid a wrong figure on both sides (Gemini review of v5).
+# Remaining blind spot, both sides alike: "USA twenty states" (a bare noun).
 _ALNUM_CAPS_RE = re.compile(
-    rf"\b[A-Z]{{3,}}\s+(?:\d{{1,4}}|(?i:{_NUMWORD_ALT}))\b")
+    rf"\b(?!(?:{_CURRENCY_CODES})\b)[A-Z]{{3,}}\s+"
+    rf"(?:\d{{1,4}}|(?i:{_NUMWORD_ALT})(?:[\s\-]+(?i:{_NUMWORD_ALT}))*)\b"
+    rf"(?![\s\-]+(?i:(?:(?:{_NUMWORD_ALT}|\d+)[\s\-]+)*(?:{_SCALE_ALT}|{_UNIT}|point)\b))")
 
 
 def collect_entity_stems(*texts: str) -> frozenset[str]:
@@ -281,10 +343,19 @@ def script_refusal(path: Path) -> str | None:
     checked `path.exists()` and cheerfully extracted 15 "numbers" from that
     file's prose (`~232.8 s`, `2026-06-30`, a UUID), which on a 6-pair `--all`
     run is one pair feeding noise straight into a pinned baseline.
+
+    `min_speakers=1`: this reads the script as TEXT, same as
+    `score_live_invariants.load_script_words`/`load_script_turns` (which
+    already pass it) — there is nothing to ATTRIBUTE here, so the 2-speaker
+    bar `load_script`'s default carries for attribution wrongly refused the
+    single-speaker `tps_clocktimes_FAC0531F` pair (2026-09-08: it was the
+    only clock-shaped golden pair and was silently never scored by this
+    file, though `score_live_invariants.py --all` — the actual INV-NUM gate
+    — was unaffected, since it already passes `min_speakers=1`).
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import golden_pair_attribution as gpa
-    return gpa.load_script(path)[1]
+    return gpa.load_script(path, min_speakers=1)[1]
 
 
 def script_body_text(path: Path) -> str:
@@ -332,11 +403,62 @@ def _prepare(text: str, stems: frozenset[str] = frozenset()) -> str:
 @dataclass
 class NumberEntity:
     raw_text: str
-    category: str  # CURRENCY PERCENTAGE BASIS_POINTS YEAR QUARTER ORDINAL QUANTITY CARDINAL APPROX
+    category: str  # CURRENCY PERCENTAGE BASIS_POINTS YEAR QUARTER ORDINAL QUANTITY CARDINAL APPROX TIME
     canonical_value: float
     unit: str
     start_char: int = 0
     end_char: int = 0
+
+
+def _split_spoken_list(phrase: str) -> list[tuple[str, int]]:
+    """Split a spoken run at an "and" that joins two NUMBERS rather than two
+    parts of one number. `_SPOKEN` admits "and" before any number word (it has
+    to: "one hundred and fifteen million"), so with the stream verbalized a
+    list read as one sum — "twenty twenty four and twenty twenty seven" = 91,
+    "fifty and sixty percent" = 110 — and a correct render scored one
+    hallucination plus two drops (2026-09-26, the Parakeet Ultra numbers gate).
+
+    An "and" stays INSIDE the number when it follows a scale word whose value
+    the right side does not restart: "one hundred and fifteen million",
+    "two thousand and five", "one million and two hundred thousand"; or when
+    a fraction follows ("three and a half"). It SPLITS after a non-scale word
+    ("fifty and sixty") or when the right side repeats a scale at least as
+    large as the left's largest thousand-or-more scale ("one thousand and two
+    thousand five hundred"). Returns (segment, char offset in `phrase`)."""
+    parts = [(mm.group(0), mm.start()) for mm in re.finditer(r"[^\s\-]+", phrase)]
+    words = [w.lower() for w, _ in parts]
+    cuts: list[int] = []
+    seg_start = 0
+    for i, w in enumerate(words):
+        if w != "and" or i == 0 or i + 1 >= len(words):
+            continue
+        left = words[seg_start:i]
+        # The right side ends at the NEXT "and": a scale belonging to a third
+        # member ("two thousand and eight AND two thousand and nine") must not
+        # split the first.
+        nxt = next((k for k in range(i + 1, len(words)) if words[k] == "and"), len(words))
+        right = words[i + 1:nxt]
+        if right[0] == "a":
+            continue
+        if left[-1] in SCALES:
+            left_max = max(SCALES[t] for t in left if t in SCALES)
+            right_scales = [SCALES[t] for t in right if t in SCALES]
+            if left_max < 1000 or not right_scales or max(right_scales) < left_max:
+                continue
+        cuts.append(i)
+        seg_start = i + 1
+    if not cuts:
+        return [(phrase, 0)]
+    out: list[tuple[str, int]] = []
+    lo = 0
+    for c in cuts + [len(words)]:
+        seg_words = parts[lo:c]
+        if seg_words:
+            start = seg_words[0][1]
+            end = seg_words[-1][1] + len(seg_words[-1][0])
+            out.append((phrase[start:end], start))
+        lo = c + 1
+    return out
 
 
 def parse_spoken_number_value(phrase: str) -> tuple[float, str]:
@@ -359,11 +481,21 @@ def parse_spoken_number_value(phrase: str) -> tuple[float, str]:
                 return float(base + y_val), "YEAR"
 
     # Implied hundreds: "two fifty" = 250, "one twenty five million" = 125e6.
-    # A ones word followed DIRECTLY by a tens word is the spoken hundreds
-    # idiom, not an addition -- summing it read "two fifty" as 52 and charged
-    # the render a corruption against a script that said 250 (2026-08-28).
-    # Only the leading pair, only 1-19 then tens (20-90), so "fifty
-    # two", "two hundred fifty" and the year shapes above are untouched.
+    # A ones word followed DIRECTLY by a round-tens word is the spoken
+    # hundreds idiom, not an addition -- summing it read "two fifty" as 52 and
+    # charged the render a corruption against a script that said 250
+    # (2026-08-28). Only the leading pair, only 1-19 then round tens (20-90),
+    # so "fifty two", "two hundred fifty" and the year shapes above are
+    # untouched.
+    #
+    # REVERTED the 2026-09-08 teen extension (it briefly also fired for a
+    # TEEN second word, so "four fifteen" read 415). That was the wrong fix
+    # for a clock: it papered over the scorer having no TIME entity by
+    # biasing this general-purpose CARDINAL parser, and it bought the clock
+    # reading at the cost of an ordinary compound like "fourteen fifteen
+    # students" silently becoming 1415. A TIME entity (see NUMBER_ENTITY_RE)
+    # now reads spoken clocks directly and correctly; this function goes back
+    # to the narrower, unbiased round-tens-only rule.
     if (len(tokens) >= 2 and tokens[0] in TEXT_NUMBERS and tokens[1] in TEXT_NUMBERS
             and 1 <= TEXT_NUMBERS[tokens[0]] <= 19
             and 20 <= TEXT_NUMBERS[tokens[1]] <= 90 and TEXT_NUMBERS[tokens[1]] % 10 == 0):
@@ -524,7 +656,19 @@ def extract_number_entities(text: str, prepared: bool = False,
                                          canonical_value=value, unit=unit,
                                          start_char=m.start(), end_char=m.end()))
 
-        if d.get("approx"):
+        if d.get("time_digit_h"):
+            hour = int(d["time_digit_h"])
+            minute = int(d["time_digit_m"])
+            add("TIME", float(hour * 100 + minute), "clock")
+        elif d.get("time_word_h"):
+            hour = TEXT_NUMBERS[d["time_word_h"].lower()]
+            mtoks = [t for t in re.split(r"[\s\-]+", d["time_word_m"].lower()) if t]
+            if mtoks[0] == "oh":
+                minute = TEXT_NUMBERS[mtoks[1]]
+            else:
+                minute = TEXT_NUMBERS[mtoks[0]] + (TEXT_NUMBERS[mtoks[1]] if len(mtoks) > 1 else 0)
+            add("TIME", float(hour * 100 + minute), "clock")
+        elif d.get("approx"):
             digits = re.search(r"(\d+)", d["approx"])
             add("APPROX", float(digits.group(1)) if digits else 0.0, "approx")
         elif d.get("frac_num"):
@@ -593,6 +737,34 @@ def extract_number_entities(text: str, prepared: bool = False,
             val = float(ORDINALS.get(d["ord_word"].lower(), 0))
             if val > 0:
                 add("ORDINAL", val, "ordinal")
+        elif d.get("spoken_num") and len(_split_spoken_list(d["spoken_num"].strip())) > 1:
+            # A LIST, not one number: "twenty twenty four and twenty twenty
+            # seven", "fifty and sixty percent" (see `_split_spoken_list`). A
+            # trailing unit belongs to every member.
+            unit_raw = (d.get("spoken_unit") or "").lower()
+            base = m.start("spoken_num")
+            segs = _split_spoken_list(d["spoken_num"].strip())
+            for k, (seg, off) in enumerate(segs):
+                val, inferred = parse_spoken_number_value(seg)
+                start = base + off
+                if inferred == "YEAR" and k < len(segs) - 1:
+                    # "twenty twenty and fifty dollars": the year is not money.
+                    entities.append(NumberEntity(raw_text=seg, category="YEAR", canonical_value=val,
+                                                 unit="year", start_char=start, end_char=start + len(seg)))
+                    continue
+                if "percent" in unit_raw or "%" in unit_raw:
+                    cat, unit = "PERCENTAGE", "%"
+                elif "basis" in unit_raw or "bps" in unit_raw:
+                    cat, unit = "BASIS_POINTS", "bps"
+                elif any(k in unit_raw for k in ("dollar", "cent", "euro", "pound")):
+                    cat, unit = "CURRENCY", CURRENCIES.get(unit_raw, "USD")
+                elif unit_raw:
+                    cat, unit = "QUANTITY", unit_raw
+                else:
+                    cat, unit = inferred, ("year" if inferred == "YEAR" else "")
+                entities.append(NumberEntity(raw_text=seg, category=cat,
+                                             canonical_value=neg * val if start == base else val,
+                                             unit=unit, start_char=start, end_char=start + len(seg)))
         elif d.get("spoken_num"):
             unit_raw = (d.get("spoken_unit") or "").lower()
             phrase = d["spoken_num"].strip()
@@ -680,6 +852,45 @@ def _reconcile_reference_shapes(entities: list[NumberEntity], clean: str,
                     e = NumberEntity(e.raw_text + m.group(0), e.category, e.canonical_value,
                                      unit, e.start_char, m.end())
         out.append(e)
+    # DOLLARS AND CENTS -- BOTH SIDES (2026-09-08). "$14.50" and the way a
+    # person says it, "fourteen dollars and fifty cents", are one amount; the
+    # extractor read the spoken form as TWO entities, so a correct render
+    # scored as a corrupted 14 plus an invented 50. This was invisible while
+    # the transcript wrote figures. With the row normalizer off, the spoken
+    # form is what EVERY money amount looks like, so the blind spot became the
+    # common case and the cell would have charged the whole money category.
+    #
+    # Unlike the billion+million merge below, this one runs on the HYPOTHESIS
+    # too, and must: the reference writes "$14.50" and the render now says the
+    # words, so fusing only the reference would leave them incomparable. It
+    # cannot hide an error -- "fourteen dollars and fifteen cents" fuses to
+    # 14.15 and still fails against 14.50. Whole-unit major side, sub-100 CENT
+    # minor side, nothing or "and" between: the only shape English uses.
+    fused: list[NumberEntity] = []
+    k = 0
+    while k < len(out):
+        a = out[k]
+        b = out[k + 1] if k + 1 < len(out) else None
+        if (
+            b is not None
+            and a.category == "CURRENCY"
+            and b.category == "CURRENCY"
+            and b.unit == "CENT"
+            and a.unit != "CENT"
+            and clean[a.end_char:b.start_char].strip().lower() in ("", "and")
+            and 0 <= b.canonical_value < 100
+            and a.canonical_value == int(a.canonical_value)
+        ):
+            fused.append(NumberEntity(
+                clean[a.start_char:b.end_char], "CURRENCY",
+                a.canonical_value + b.canonical_value / 100.0,
+                a.unit, a.start_char, b.end_char))
+            k += 2
+            continue
+        fused.append(a)
+        k += 1
+    out = fused
+
     if not reference:
         return out
     # `0.72 cents` / `0.75 cents` (4341191): Rev.com writes a cents amount as
@@ -749,8 +960,15 @@ SPLICE_RULES: list[tuple[str, re.Pattern[str], str]] = [
     # and so is a following `one`: "in 2020 one of our customers" is ordinary
     # English, and `one` is the only number word frequent enough as a pronoun
     # to make that a real false-positive source.
+    # The quarter exemption above, mirrored: "Q1 twenty twenty" is the same
+    # QUARTER+YEAR phrase with the quarter written and the year spoken.
+    # Parakeet Ultra writes the quarter as a digit far more often than v3
+    # ("Q2" 62 vs 23 on the 11 earnings21 files, 2026-09-26), and every hit
+    # of this rule on that arm was this shape. ONLY before a spoken year: "Q3
+    # three" / "Q1 five hundred" are still splices (review 2026-09-26).
     ("DIGIT_WORD_SPLICE",
-     re.compile(rf"\d\s+(?!one\b)(?:{_NW})\b(?!\s*(?:{_SC})\b)", re.I),
+     re.compile(rf"(?:(?<!\bQ)(?<!\bQ\s)\d|\bQ\s?[1-4](?!\s+(?:twenty|nineteen|two\s+thousand)\b))"
+                rf"\s+(?!one\b)(?:{_NW})\b(?!\s*(?:{_SC})\b)", re.I),
      "a digit form immediately followed by a spoken number word"),
     # "Q33", "Q 300" — a quarter marker carrying more digits than a quarter has.
     ("QUARTER_DIGIT_SPLICE",
@@ -782,6 +1000,24 @@ SPLICE_RULES: list[tuple[str, re.Pattern[str], str]] = [
      re.compile(rf"\b\d+(?:,\d{{3}})*(?:\.\d+)?\.?\s+\d+(?:,\d{{3}})*(?:\.\d+)?(?![,.]?\d)\b(?!\s*(?:{_SC}|%))", re.I),
      "two digit runs adjacent with no unit between them"),
 ]
+
+
+def splice_rules_blind(text: str) -> bool:
+    """True when the digit-anchored splice rules cannot see this rendering.
+
+    ZERO-ITN (2026-09-08). Five of the six `SPLICE_RULES` are built on `\\d`
+    character classes; only ORPHAN_SCALE is digit-free. Once the transcript
+    stops writing figures those five go structurally INERT, and the cell
+    reports 0 defects on text it never examined — a FALSE PASS. `splice
+    defects` is a PUBLISHED pin, so that zero would be read as a measurement
+    rather than as the absence of one.
+
+    Reuses `looks_pre_itn`'s substrate test rather than adding a second
+    definition of "this text spells its numbers". A blind cell must SAY so.
+    The real fix is word-form alternatives in the five rules, which owes its
+    own measurement and is deliberately NOT attempted here.
+    """
+    return looks_pre_itn(text)
 
 
 def find_splice_defects(text: str, stems: frozenset[str] = frozenset(),
@@ -899,7 +1135,14 @@ def scan_tick_splices(ticks: list[dict], final_text: str,
 # ---------------------------------------------------------------------------
 
 _INTERCHANGEABLE = ({"CARDINAL", "QUANTITY"}, {"CARDINAL", "YEAR"},
-                    {"CARDINAL", "CURRENCY"}, {"ORDINAL", "QUARTER"})
+                    {"CARDINAL", "CURRENCY"}, {"ORDINAL", "QUARTER"},
+                    # A clock's digit form ("415") extracts as a bare CARDINAL
+                    # -- there is no way to tell it apart from an identifier
+                    # at that point, and there does not need to be: the VALUE
+                    # is what the gate cares about, and TIME<->CARDINAL keeps
+                    # "4:15" / "415" / "four fifteen" one comparison instead
+                    # of three.
+                    {"CARDINAL", "TIME"})
 
 
 def is_canonical_match(ref: NumberEntity, hyp: NumberEntity) -> bool:
@@ -1415,7 +1658,7 @@ def score_number_fidelity(script_text: str, hypothesis_text: str,
          # numeric threshold (audit 2026-08-24: they always read "low").
          "severity": "high" if (
              (abs(h.canonical_value) >= 1000
-              and h.category in ("CURRENCY", "CARDINAL", "QUANTITY"))
+              and h.category in ("CURRENCY", "CARDINAL", "QUANTITY", "TIME"))
              or (abs(h.canonical_value) >= 100
                  and h.category in ("PERCENTAGE", "BASIS_POINTS"))) else "low"}
         for i, h in enumerate(hyp_entities)
@@ -1562,6 +1805,8 @@ def score_number_fidelity(script_text: str, hypothesis_text: str,
                                         if h["severity"] == "high"),
         "hallucinationDetails": _cap(hallucinations, 15),
         "spliceDefects": len(final_splices),
+        # Says whether the number above is a MEASUREMENT or an absence of one.
+        "spliceRulesBlind": splice_rules_blind(hypothesis_text),
         # Reported, not gated: the reference carries the same shape here.
         "spliceScriptAttested": len(attested),
         "spliceScriptAttestedDetails": _cap(attested, 10),
@@ -2115,6 +2360,21 @@ def _self_check() -> int:
         ok = got == want
         bad += not ok
         print(f"  {'ok  ' if ok else 'FAIL'}  {phrase:<48s} -> {got}")
+
+    # The reverted teen extension (2026-09-08, scorer v3): a units+teen
+    # compound must NOT read as an implied hundred any more -- that bias is
+    # exactly what an external review flagged, and it is now the TIME
+    # entity's job to read an actual clock (tested separately below).
+    print("\nunits+teen is no longer an implied hundred (v3 revert):")
+    _reverted_cases = [
+        ("fourteen fifteen", 1415.0), ("four fifteen", 415.0),
+        ("twelve fifteen", 1215.0), ("eleven fifteen", 1115.0),
+    ]
+    for phrase, not_want in _reverted_cases:
+        got = parse_spoken_number_value(phrase)[0]
+        ok = got != not_want
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {phrase:<48s} -> {got} (must not be {not_want})")
     _signed_cases = [
         ("free cash flow was -\u20ac33 million in the quarter", -33e6),
         ("free cash flow was -$33 million in the quarter", -33e6),
@@ -2125,6 +2385,97 @@ def _self_check() -> int:
         ok = want in vals
         bad += not ok
         print(f"  {'ok  ' if ok else 'FAIL'}  {text:<48s} -> {vals}")
+
+    print("\n=== v5: spoken lists, code masks, quantities after acronyms ===")
+    _v5_cases = [
+        ("between twenty twenty four and twenty twenty seven", [2024.0, 2027.0]),
+        ("two thousand and eight and two thousand and nine", [2008.0, 2009.0]),
+        ("one hundred and fifteen million dollars", [115e6]),
+        ("two thousand and five", [2005.0]),
+        ("three and a half million", [3.5e6]),
+        ("one thousand and two thousand five hundred", [1000.0, 2500.0]),
+        ("fifty and sixty percent", [50.0, 60.0]),
+        ("twenty twenty and fifty dollars", [2020.0, 50.0]),
+        ("net revenues of EUR three point zero eight billion", [3.08e9]),
+        ("the EPS twenty one cents this quarter", [21.0]),
+        ("the GDP three percent growth", [3.0]),
+        ("ADX twenty one ninety one program", []),
+        ("COVID nineteen cases", []),
+    ]
+    for text, want in _v5_cases:
+        got = [e.canonical_value for e in extract_number_entities(text)]
+        ok = got == want
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {text:<48s} -> {got}")
+
+    print("\n=== TIME entity: a colon clock is ONE entity, not two CARDINALs (v3) ===")
+    _time_extract_cases = [
+        ("We need it by 4:15.", [("TIME", 415.0, "clock")]),
+        ("I approved it at 11:59 on a Friday.", [("TIME", 1159.0, "clock")]),
+        ("The call is at 10:05 tomorrow.", [("TIME", 1005.0, "clock")]),
+        ("Let's meet around 4:45.", [("TIME", 445.0, "clock")]),
+        ("four fifteen", [("TIME", 415.0, "clock")]),
+        ("eleven fifty-nine", [("TIME", 1159.0, "clock")]),
+        ("twelve fifteen", [("TIME", 1215.0, "clock")]),
+        ("ten thirty", [("TIME", 1030.0, "clock")]),
+        # A scale/currency/unit word right after defers to the ordinary
+        # reading -- this is what keeps "one twenty five million" a CARDINAL
+        # $125,000,000 instead of a bogus clock.
+        ("one twenty five million", [("CARDINAL", 125e6, "")]),
+        ("fourteen fifteen students", [("CARDINAL", 29.0, "")]),
+    ]
+    for text, want in _time_extract_cases:
+        got = [(e.category, e.canonical_value, e.unit) for e in extract_number_entities(text)]
+        ok = got == want
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {text:<48s} -> {got}")
+
+    print("\n=== TIME <-> CARDINAL: a clock matches its digit and word forms (v3) ===")
+    _time_match_cases = [
+        ("4:15 vs bare 415", NumberEntity("4:15", "TIME", 415.0, "clock"),
+         NumberEntity("415", "CARDINAL", 415.0, ""), True),
+        ("11:59 vs 'eleven fifty-nine'", NumberEntity("11:59", "TIME", 1159.0, "clock"),
+         NumberEntity("eleven fifty-nine", "TIME", 1159.0, "clock"), True),
+        ("4:15 vs 4:16 is NOT a match", NumberEntity("4:15", "TIME", 415.0, "clock"),
+         NumberEntity("4:16", "TIME", 416.0, "clock"), False),
+    ]
+    for label, a, b, want in _time_match_cases:
+        got = is_canonical_match(a, b)
+        ok = got == want
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {label:<48s} -> {got}")
+
+    print("\n=== dollars and cents fuse to one amount, BOTH sides (v4) ===")
+    _cents_cases = [
+        ("$14.50 vs 'fourteen dollars and fifty cents'", "$14.50",
+         "fourteen dollars and fifty cents", True),
+        ("a WRONG cents value still fails", "$14.50",
+         "fourteen dollars and fifteen cents", False),
+        ("$2.05 vs 'two dollars and five cents'", "$2.05",
+         "two dollars and five cents", True),
+        ("$3.99 vs 'three dollars and ninety nine cents'", "$3.99",
+         "three dollars and ninety nine cents", True),
+    ]
+    for label, ref_t, hyp_t, want in _cents_cases:
+        r = extract_number_entities(f"it was {ref_t} today", reference=True)
+        h = extract_number_entities(f"it was {hyp_t} today")
+        got = any(is_canonical_match(a, b) for a in r for b in h)
+        ok = got == want
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {label:<48s} -> {got}")
+    # The fusion must not swallow a neighbouring non-money quantity, a
+    # bare cents amount, or the reference-only billion+million merge.
+    _cents_guards = [
+        ("units after 'and' are not cents", "we sold three dollars and fifty units", 2),
+        ("'and a half' is not a cents amount", "two dollars and a half", 1),
+        ("billion+million still one amount", "one billion five hundred million dollars", 1),
+        ("a bare cents amount stands alone", "he paid ninety nine cents", 1),
+    ]
+    for label, text, want_n in _cents_guards:
+        got_n = len(extract_number_entities(text))
+        ok = got_n == want_n
+        bad += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {label:<48s} -> {got_n} entities (want {want_n})")
 
     print(f"\n{'\u2705 self-check passed' if not bad else f'\u274c {bad} failure(s)'}")
     return 1 if bad else 0
@@ -2153,7 +2504,38 @@ def _self_check() -> int:
 #      excuses (invented 112 -> 67), locality window on the entity-code excuse.
 #   2  2026-09-01: the locality window is ANCHORED on the nearest matched
 #      entity pair (relative position only as fallback), floor 1,500 -> 600.
-SCORER_VERSION = 2
+#   3  2026-09-08: added a TIME entity (colon clocks `4:15`/`11:59` and their
+#      spoken form `four fifteen`/`eleven fifty-nine`, hour restricted to
+#      1-12, interchangeable with CARDINAL by value) so a colon clock stops
+#      shredding into two CARDINALs and scoring a correct render as both a
+#      corruption and a drop. Paired revert: `parse_spoken_number_value`'s
+#      2026-09-08 "teen" extension to the implied-hundreds idiom is reverted
+#      back to round-tens-only, since the TIME entity now reads clocks
+#      directly and the extension was biasing ground truth on ordinary
+#      compounds ("fourteen fifteen students" no longer reads 1415). Moves
+#      gated counts on an unchanged transcript wherever a clock time or a
+#      units+teen compound appears -- re-pin, do not `--allow-cross-version`.
+#   4  2026-09-08: dollars-and-cents fusion on BOTH sides. "$14.50" and the
+#      way a person says it, "fourteen dollars and fifty cents", are one
+#      amount; the extractor read the spoken form as two entities and scored
+#      a correct render as a corrupted 14 plus an invented 50. Whole-unit
+#      major side, sub-100 CENT minor side, "" or "and" between. Unlike the
+#      billion+million merge this runs on the HYPOTHESIS too, and must: with
+#      row-level ITN off (zero-ITN, same day) the reference writes "$14.50"
+#      and the render says the words, so fusing only the reference leaves
+#      them incomparable. It cannot hide an error -- "fourteen dollars and
+#      FIFTEEN cents" fuses to 14.15 and still fails against 14.50. Moves
+#      the money category on an unchanged transcript -- re-pin.
+#   5  2026-09-26: spoken LISTS split at "and" (`_split_spoken_list`:
+#      "twenty twenty four and twenty twenty seven" is two years, not 91);
+#      the all-caps code mask covers the whole spoken run ("ADX twenty one
+#      ninety one") and never an ISO currency code ("EUR three point zero
+#      eight billion" is an amount) nor a QUANTITY after an acronym ("EPS
+#      twenty one cents"); a list member's "and" is judged only up to the
+#      next "and"; a year-shaped list member never takes the trailing unit.
+#      Moves gated counts wherever the render is verbalized -- re-pin, do
+#      not `--allow-cross-version`.
+SCORER_VERSION = 5
 
 _CORPUS_GATED = ("corruptions", "droppedFromRender", "hallucinatedNumbers",
                  "spliceDefects", "hallucinatedHighSeverity")

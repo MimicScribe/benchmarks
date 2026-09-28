@@ -21,6 +21,12 @@ A fifth arm, Parakeet Unified 0.6B, a model built for live transcription, was
 decoded over the same 27 files on 2026-09-25 and has its own section. Nothing
 already on this page was re-decoded for it.
 
+A sixth arm, Parakeet Ultra, a post-training of Parakeet v3, was added on
+2026-09-27 and replaced v3 in the product. Its section re-scores every arm on a
+content basis (filled pauses and casual forms folded, numbers scored
+separately), because Ultra writes fewer filled pauses than the verbatim
+reference expects. The earlier tables are unchanged.
+
 Two streaming models, Voxtral Realtime 4B and Moonshine Streaming Medium, were
 probed on a single file after publication and are reported separately below.
 Neither was part of the measured comparison and their section says so.
@@ -337,6 +343,105 @@ and almost none it should not.
 **Verdict: not a replacement.** It deletes more than the model the product
 ships, in both of its own modes on the files tried, and its punctuation is too
 sparse to split speakers on.
+
+## Parakeet Ultra — the model the product ships now
+
+Added 2026-09-27. [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra)
+is moondream's post-training of Parakeet TDT 0.6B v3 (CC BY 4.0): the same
+architecture, tokenizer and 25 languages with different weights. It runs
+through FluidInference's CoreML conversion, int8 encoder on the Neural Engine,
+inside the same pipeline as the v3 pipeline rows on this page, and from this
+date it is the model the product ships.
+
+Ultra writes fewer filled pauses than v3 and expands casual forms ("gonna"
+becomes "going to"). A verbatim reference charges both as errors, so on this
+page's verbatim basis the two pipelines are level: 15.58% for Ultra against
+15.36% for v3 on the same build (15.46% for the rc.27 pipeline arm above). All
+of Ultra's extra deletions on that basis are filled pauses: it leaves out 728
+more "uh"s than v3.
+
+**Every arm, on a content basis.** The table below re-scores every 27-file arm
+on this page with three changes, each applied to the reference and the
+hypothesis alike: filled pauses removed, casual forms folded to their
+expansion, and number words and digits left out. The last one is there because
+some arms write "2020" and others "twenty twenty", and the comparison should not
+turn on spelling. Numbers are scored by value in the next table instead.
+
+27 files, pooled, content basis, numbers excluded:
+
+| arm | error rate | sub | del | ins | AMI | Earnings-21 |
+|---|---:|---:|---:|---:|---:|---:|
+| **Parakeet Ultra, MimicScribe pipeline** | **13.63%** | 7,423 | **10,262** | 4,901 | **20.68%** | **7.65%** |
+| Parakeet v3 int8-v2, MimicScribe pipeline, same build | 14.14% | 7,440 | 11,148 | 4,849 | 21.72% | 7.72% |
+| Parakeet v3 int8-v2, MimicScribe pipeline (rc.27, the arm above) | 14.27% | 7,400 | 11,463 | 4,798 | 21.93% | 7.79% |
+| Parakeet v3 int8-v2, FluidAudio batch (the comparator) | 15.09% | 7,187 | 13,259 | 4,564 | 23.49% | 7.98% |
+| Parakeet v3 stock int8, FluidAudio batch | 15.54% | 7,191 | 14,260 | 4,303 | 24.48% | 7.97% |
+| Parakeet v3, NeMo | 15.44% | 7,083 | 15,258 | 3,253 | 22.33% | 9.61% |
+| Parakeet v2, FluidAudio batch | 16.48% | 6,768 | 17,201 | 3,343 | 24.26% | 9.89% |
+| Parakeet v2, NeMo | 16.62% | 6,322 | 18,668 | **2,558** | 23.90% | 10.46% |
+| Parakeet Unified 0.6B, streaming | 16.77% | **5,426** | 19,698 | 2,670 | 23.85% | 10.77% |
+| Cohere Transcribe (loop-patched) | 17.28% | 5,708 | 19,641 | 3,300 | 25.92% | 9.98% |
+
+Ultra is better than v3 through the same pipeline on 22 of the 27 files, worse
+on 4 and level on 1, and the gain is deletions: 886 fewer reference words
+dropped, with substitutions and insertions level. The gaps narrow for the arms
+that leave filled pauses out: Cohere goes from 4.9 points behind the pipeline
+to 3.0 behind v3's pipeline, and v2 from 3.1 to 1.4 behind v3's batch
+comparator. NeMo v3 moves ahead of the stock-encoder batch arm, and v2 ahead of
+Parakeet Unified.
+
+**Numbers, re-scored on one build.** Every arm's rows were put through the same
+normalizer build and scored by a later version of the number scorer than the
+Numbers table below, so this table and that one do not mix. The v3 pipeline arm
+reproduces its published 2,769 intact figures exactly on the new build and scorer.
+
+| arm | scored | intact | wrong quantity | dropped | never said | doubled or spliced form |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, pipeline | 2,857 | 2,755 (96.4%) | 41 | 61 | 87 | 5 |
+| Parakeet v3 int8-v2, pipeline, same build | 2,861 | **2,769 (96.8%)** | 42 | **50** | 91 | 11 |
+| Parakeet v3 int8-v2, pipeline (rc.27) | 2,860 | 2,769 (96.8%) | 37 | 54 | 71 | 6 |
+| Parakeet v3 int8-v2, batch | 2,859 | 2,747 (96.1%) | 44 | 68 | 84 | 10 |
+| Parakeet v3 stock int8, batch | 2,857 | 2,746 (96.1%) | 43 | 68 | 79 | 9 |
+| Parakeet v2, batch | 2,847 | 2,732 (96.0%) | 43 | 72 | 66 | 0 |
+| Parakeet v2, NeMo | 2,839 | 2,712 (95.5%) | 33 | 94 | 60 | 1 |
+| Parakeet v3, NeMo | 2,850 | 2,685 (94.2%) | **29** | 136 | 58 | 0 |
+| Cohere Transcribe | 2,851 | 2,725 (95.6%) | 37 | 89 | **57** | 4 |
+| Parakeet Unified 0.6B | 2,843 | 2,687 (94.5%) | 49 | 107 | 88 | 6 |
+
+Ultra keeps 14 fewer figures intact than v3 through the same pipeline and drops
+11 more. Part of that is the scoring path, not the transcript: the product now
+writes every quantity as words, and re-normalizing Ultra's words to digits for
+scoring joins some neighbours that were spoken apart ("another one eighty, uh,
+140 million dollars" scores as one figure). Scored on the rows as the product
+saves them, without that step, Ultra keeps 2,730 of 2,854 intact against v3's
+2,725 of 2,858. The table above is the one comparable to every other arm, and on
+it Ultra is 0.4 points behind v3.
+
+**The one meeting every model decoded** (IS1009a), on the same scorers as the
+streaming-probe section below:
+
+| | Parakeet Ultra, pipeline | Parakeet v3, pipeline (rc.27) |
+|---|---:|---:|
+| real words skipped on clean speech, fillers stripped | **1.7%** (22 of 1,273) | 2.5% (32 of 1,273) |
+| error rate, fillers stripped | **17.2%** | 17.7% |
+| sentence ends at a speaker change | **92%** | 89% |
+
+That meeting flatters Ultra on punctuation. Across all 16 AMI meetings its
+sentence ends are more precise and fewer: precision 77.0% against 74.7%, recall
+82.8% against 88.1%, and sentence ends at a speaker change 86.0% against 90.0%
+for v3 on the same build. The product splits speakers partly on sentence ends,
+so this is the cost that matters most, and it is published here for that
+reason.
+
+**What else differs.** Ultra writes some characters v3's vocabulary never had
+(quotes, parentheses, dashes, "&") as an unknown token; the product restores
+"&" and paired brackets or quotes and drops the rest. Outside this corpus, on
+FLEURS read speech in ten European languages, its error rate is lower than v3's
+in every one of the ten (6.56% against 7.66% mean).
+
+**Verdict: the replacement.** Fewer words dropped than any arm on this page,
+the same substitution and insertion counts as v3, and a small loss on number
+fidelity and on sentence ends at speaker changes, both measured above.
 
 ## Two streaming models — probes, not arms
 
@@ -895,6 +1000,14 @@ Provenance table carries.
 python3 scripts/score_corpus_wer.py --arms <A> <B> --labels pipeline cohere --per-file
 python3 scripts/score_number_fidelity.py --corpus <arm>/per-file --json-out numbers.json
 
+# 6c. The Parakeet Ultra section. Content basis for any number of arms, on the
+#     files they share (filled pauses and casual forms folded on both sides;
+#     the last column also drops number words and digits on both sides):
+python3 scripts/score_content_wer.py "ultra=<dir>" "v3=<dir>" "cohere=<dir>" ...
+#     Its number table: every arm's rows through step 6b on ONE build, then
+#     the current number scorer (the Numbers table above used an earlier one;
+#     this directory's git history has it).
+
 # 7. The blind judge, run 4. Defaults: 40 windows per corpus, 15% of windows
 #    graded twice, seed 1234, temperature 0.1, one call at a time. Every arm
 #    directory here is the NORMALIZED copy (step 6b), so no arm is identifiable
@@ -967,6 +1080,7 @@ moves.
 | Cohere Transcribe 03-2026 (2B) | `evewashere/cohere-transcribe-03-2026-ungated` | `29b9036c` | 2026-03-24, mirror 2026-07-21 | MPS, float16 |
 | Granite Speech 4.1-2b | `ibm-granite/granite-speech-4.1-2b` | `de575db6` | 2026-04-16 | MPS, bfloat16 |
 | Voxtral Realtime 4B (probe, 1 file, 2026-09-06) | `mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit` | 4-bit, 480 ms delay | 2026-02-04 | MLX on Apple Silicon GPU |
+| Parakeet Ultra, MimicScribe pipeline (arm, 27 files, 2026-09-27) | `moondream/parakeet-ultra` via `FluidInference/parakeet-ultra-coreml` | CoreML `95eaa59a`, int8 encoder; app `964e6af11` | 2026-09-22 | CoreML on Apple Silicon, same pipeline as the v3 rows |
 | Parakeet Unified 0.6B (arm, 27 files, 2026-09-25) | `nvidia/parakeet-unified-en-0.6b` via `FluidInference/parakeet-unified-en-0.6b-coreml`, int8 | streaming encoder `70_7_7` weights `f145c8da…`, offline encoder `f984b815…`; FluidAudio same | 2026-04-07 | CoreML on Apple Silicon, `StreamingUnifiedAsrManager`, 1,120 ms |
 | Moonshine Streaming Medium (probe, 1 file, 2026-09-21) | `moonshine-ai/moonshine-streaming-medium`, vendor build `quantized_26_08_21` | vendor download, not the Hugging Face weights; `moonshine-voice` 0.1.5, 200 ms chunks | 2026-01-06 | ONNX Runtime 1.23.2, CPU |
 
@@ -993,7 +1107,10 @@ run at `benchmark/output/audit-cohere-loopfix`, the NeMo arms at
 `benchmark/output/bakeoff-nemo-{v2,v3}`, the Parakeet Unified arm at
 `benchmark/output/bakeoff-unified-1120`. The MimicScribe pipeline arm is
 `benchmark/output/swift_pipeline_2026-08-30T021253Z`, decoded by app commit
-`5c847cf5`, which shipped as v1.0.0-rc.27.
+`5c847cf5`, which shipped as v1.0.0-rc.27. The Parakeet Ultra arm is
+`benchmark/output/swift_pipeline_2026-09-27T213110Z`, a cold decode by app
+commit `964e6af11`; its same-build v3 row replays v3's recorded window decodes
+through that build's pipeline.
 
 ## What this page is not
 

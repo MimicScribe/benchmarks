@@ -181,6 +181,7 @@ ITN_BIN_OVERRIDE: str | None = None
 ITN_CACHE_DIR = DATA.parent / "cache" / "itn_text"
 _ITN_BIN: Path | None = None
 _ITN_BIN_ID: str | None = None
+_ITN_CONVERTS: bool | None = None
 _ACRONYM = re.compile(r"^(?:[A-Za-z]_)+$")
 
 
@@ -219,6 +220,29 @@ def _itn_bin() -> Path:
              "MIMICSCRIBE_BIN). Refusing to score on the raw basis by accident; pass --raw to mean it.")
 
 
+def itn_converts_numbers() -> bool:
+    """Does `--itn-text` still CONVERT a spoken quantity, or is it a no-op?
+
+    Since zero-ITN (2026-09-08) the number taggers are gated INSIDE
+    `InverseTextNormalizer.normalizeRow`, which is the very function this
+    basis runs both sides through. So the mitigation this file exists for --
+    stop charging a correct number as an error because one side spells it and
+    the other writes digits -- can be silently INERT while the basis line
+    still says ITN-NORMALIZED and the gate's cross-basis refusal never fires.
+    That is a false PASS on pinned word-accuracy numbers, which is the
+    dangerous direction.
+
+    Probed with a canary rather than assumed: a build that converts turns this
+    into digits, a build that does not returns it unchanged. Cached with the
+    binary identity like every other ITN result.
+    """
+    global _ITN_CONVERTS
+    if _ITN_CONVERTS is None:
+        canary = "in twenty twenty one revenue was fifty nine million dollars"
+        _ITN_CONVERTS = itn_lines([canary])[0].strip() != canary
+    return _ITN_CONVERTS
+
+
 def itn_bin_id() -> str:
     _itn_bin()
     return _ITN_BIN_ID or "?"
@@ -236,7 +260,11 @@ def itn_lines(lines: list[str]) -> list[str]:
         return list(lines)
     clean = [(l or "").replace("\r", " ").replace("\n", " ") for l in lines]
     binp = _itn_bin()
-    key = hashlib.sha1((str(_ITN_BIN_ID) + "\0" + "\n".join(clean)).encode("utf-8")).hexdigest()
+    # MIMICSCRIBE_ITN_NUMBERS changes what --itn-text returns (zero-ITN,
+    # 2026-09-08), so it is part of the key: without it a converting run and an
+    # inert run of the same binary served each other's cached lines.
+    numbers = os.environ.get("MIMICSCRIBE_ITN_NUMBERS", "")
+    key = hashlib.sha1((str(_ITN_BIN_ID) + "\0" + numbers + "\0" + "\n".join(clean)).encode("utf-8")).hexdigest()
     ITN_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = ITN_CACHE_DIR / f"{key}.txt"
     if cache.exists():
@@ -417,6 +445,127 @@ def hypothesis(arm: Path, file_id: str, stage: str | None = None) -> list[str] |
     return out
 
 
+# --------------------------------------------------------------------------
+# INSERTION CAUSE CLASSIFIER (--insertion-causes)
+#
+# The module docstring says "read the insertion histogram, never the bare `ins`
+# total", and `ins_hist` is a WORD-frequency count: it says `uh` appeared 119
+# times, not WHY. This says why. Measured on main's own 27-file arm 2026-09-03:
+# on AMI barely a quarter of insertions are a word the app made up. The rest is
+# transcription CONVENTION (we expand `wanna` to `want to`; we transcribe the
+# fillers and false starts the reference drops) or reference COVERAGE (long
+# stretches of real speech, whole opening and closing passages and one passage
+# of Dutch, that the reference does not transcribe at all).
+#
+# This is REPORTING, deliberately not a new score. `gate_live_transcription_pins.py`
+# still gates the bare `ins` total at tolerance 0, which is the thing the module
+# docstring already told it not to read. Fix that with the numbers this prints,
+# not by guessing a new rule.
+#
+# Every bucket is a HEURISTIC over reference context. `contraction` uses a
+# 3-character prefix test and will over-claim a little. `other` is the residue
+# and the only bucket worth acting on. Read the examples, not just the count.
+# --------------------------------------------------------------------------
+_COLLOQ = {
+    "wanna", "gonna", "dunno", "gotta", "kinda", "sorta", "lemme", "gimme",
+    "coulda", "shoulda", "woulda", "oughta", "cos", "cuz", "outta", "lotta",
+    "gotcha", "yknow", "innit", "aint",
+}
+_FILLER = {
+    "uh", "um", "mm", "mmhmm", "hmm", "huh", "eh", "ah", "oh", "er", "erm",
+    "mhm", "uhhuh", "hm",
+}
+_NUM_WORDS = {
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+    "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+    "sixteen", "seventeen", "eighteen", "nineteen", "twenty", "thirty",
+    "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred",
+    "thousand", "million", "billion", "trillion", "point",
+}
+# Two-letter words that are ordinary vocabulary, so a short insertion of one is
+# not a false start. Without this every real `it`/`we`/`of` lands in `fragment`.
+_KEEP2 = {
+    "i", "a", "no", "ok", "we", "it", "to", "do", "so", "on", "of", "in", "at",
+    "is", "be", "my", "me", "he", "up", "if", "as", "an", "or", "by", "go",
+    "us", "am", "im", "id",
+}
+# A pure `insert` opcode at least this long is a stretch of hypothesis with no
+# reference correspondence at all. On ES2002a two such stretches (59 words at
+# the head, 136 at the tail) hold 10% of the file's hypothesis words: real
+# speech the AMI reference never transcribed. Charging those to the decoder as
+# hallucination is what makes the bare total unreadable.
+_NO_REF_RUN = 8
+
+
+def _iw(w):
+    """Insertion-classifier normal form: letters, digits and apostrophes."""
+    return re.sub(r"[^a-z0-9']", "", w.lower())
+
+
+def classify_insertions(ref, hyp, opcodes):
+    """Bucket every inserted word by the cause its reference context implies.
+
+    Returns (Counter, {bucket: [example strings]}). Buckets:
+      contraction  the reference keeps a short spoken form we expanded
+      numeral      the reference carries a digit where we spelled the number
+      no_ref_span  a long run of hypothesis the reference does not cover
+      split        one reference word we emitted as two
+      filler       a filler the reference convention drops
+      fragment     a one/two-character false start the reference drops
+      duplicate    the same word twice running (the seam-double shape)
+      other        the residue: a word we appear to have made up
+    """
+    causes = collections.Counter()
+    examples = collections.defaultdict(list)
+    for tag, i1, i2, j1, j2 in opcodes:
+        if tag == "replace":
+            nr, nh = i2 - i1, j2 - j1
+            if nh <= nr:
+                continue
+            span = range(j1 + nr, j2)
+        elif tag == "insert":
+            span = range(j1, j2)
+        else:
+            continue
+        wide = tag == "insert" and (j2 - j1) >= _NO_REF_RUN
+        near = {_iw(x) for x in ref[max(0, i1 - 4):i1 + 4]}
+        for j in span:
+            w = _iw(hyp[j])
+            prev = _iw(hyp[j - 1]) if j > 0 else ""
+            nxt = _iw(hyp[j + 1]) if j + 1 < len(hyp) else ""
+            joined = [x for x in (prev + w, w + nxt) if len(x) > 2]
+            if wide:
+                bucket = "no_ref_span"
+            elif near & _COLLOQ or any(
+                r for r in near
+                if len(r) >= 4 and (
+                    (prev and r[:3] == prev[:3] and len(r) < len(prev) + len(w))
+                    or (nxt and r[:3] == w[:3] and len(r) < len(w) + len(nxt)))):
+                bucket = "contraction"
+            elif w in _NUM_WORDS and any(any(c.isdigit() for c in r) for r in near):
+                bucket = "numeral"
+            elif any(x in near for x in joined):
+                bucket = "split"
+            elif w in _FILLER:
+                bucket = "filler"
+            elif len(w) <= 2 and w.isalpha() and w not in _KEEP2:
+                # `.isalpha()` matters: without it every two-digit number
+                # ("29 billion") scored as a false-start fragment.
+                bucket = "fragment"
+            elif any(c.isdigit() for c in w):
+                bucket = "numeral"
+            elif w and (w == prev or w == nxt):
+                bucket = "duplicate"
+            else:
+                bucket = "other"
+            causes[bucket] += 1
+            if len(examples[bucket]) < 8:
+                examples[bucket].append(
+                    " ".join(hyp[max(0, j - 4):j]) + " [" + hyp[j] + "] "
+                    + " ".join(hyp[j + 1:j + 4]))
+    return causes, examples
+
+
 def score(ref: list[str], hyp: list[str]) -> dict:
     """Edit script with the insertion/deletion/substitution populations kept.
 
@@ -427,7 +576,8 @@ def score(ref: list[str], hyp: list[str]) -> dict:
     ins_words: list[str] = []
     del_words: list[str] = []
     sub_pairs: list[tuple[str, str]] = []
-    for tag, i1, i2, j1, j2 in SequenceMatcher(a=ref, b=hyp, autojunk=False).get_opcodes():
+    opcodes = SequenceMatcher(a=ref, b=hyp, autojunk=False).get_opcodes()
+    for tag, i1, i2, j1, j2 in opcodes:
         if tag == "replace":
             nr, nh = i2 - i1, j2 - j1
             sub += min(nr, nh)
@@ -449,6 +599,7 @@ def score(ref: list[str], hyp: list[str]) -> dict:
         "n": n, "hyp_n": len(hyp), "sub": sub, "del": dele, "ins": ins,
         "wer": (sub + dele + ins) / n if n else 0.0,
         "ins_words": ins_words, "del_words": del_words, "sub_pairs": sub_pairs,
+        "ins_causes": classify_insertions(ref, hyp, opcodes),
     }
 
 
@@ -1025,6 +1176,10 @@ def main() -> int:
     ap.add_argument("--labels", nargs="*", default=None)
     ap.add_argument("--top", type=int, default=25)
     ap.add_argument("--per-file", action="store_true")
+    ap.add_argument("--insertion-causes", action="store_true",
+                    help="break the insertion total down by CAUSE (convention, "
+                         "reference coverage, duplicate, residue) — the module "
+                         "docstring's 'never read the bare ins total', made actionable")
     ap.add_argument("--stratify", action="store_true",
                     help="AMI deletion rate split by overlapped vs clean speech")
     ap.add_argument("--stage", default=STAGE, choices=STAGES,
@@ -1074,7 +1229,15 @@ def main() -> int:
     ids = sorted(set().union(*per_arm.values()))
     scored = [(f, r) for f, r in ((f, reference(f)) for f in ids) if r]
     n_ami = sum(1 for _, (c, _) in scored if c == "ami")
-    if ITN_ENABLED:
+    if ITN_ENABLED and not itn_converts_numbers():
+        # A THIRD basis, so the gate refuses rather than compares. The pass
+        # still runs (acronym joining and the address/month hygiene are live),
+        # but it no longer moves numbers, so these rows are NOT comparable to a
+        # pin taken when it did.
+        print(f"basis: ITN-INERT — the row normalizer no longer converts numbers "
+              f"(zero-ITN); reference and rows compared AS SPOKEN, acronyms still joined, "
+              f"via {_itn_bin()} (id {itn_bin_id()})")
+    elif ITN_ENABLED:
         print(f"basis: ITN-NORMALIZED — reference AND rows through InverseTextNormalizer.normalizeRow "
               f"via {_itn_bin()} (id {itn_bin_id()}); AMI spelled acronyms joined")
     else:
@@ -1089,6 +1252,9 @@ def main() -> int:
         agg = collections.Counter()
         by_corpus = collections.defaultdict(collections.Counter)
         ins_h, del_h, sub_h = collections.Counter(), collections.Counter(), collections.Counter()
+        ins_causes = collections.Counter()
+        causes_by_corpus = collections.defaultdict(collections.Counter)
+        cause_examples = collections.defaultdict(list)
         per_file = {}
         for fid, (corpus, ref) in scored:
             hyp = hypothesis(arm, fid)
@@ -1102,9 +1268,18 @@ def main() -> int:
             ins_h.update(s["ins_words"])
             del_h.update(s["del_words"])
             sub_h.update(f"{a}->{b}" for a, b in s["sub_pairs"])
+            causes, cex = s["ins_causes"]
+            ins_causes.update(causes)
+            causes_by_corpus[corpus].update(causes)
+            for bucket, rows in cex.items():
+                if len(cause_examples[bucket]) < 8:
+                    cause_examples[bucket].append(f"[{fid}] {rows[0]}")
         results[label] = {
             "agg": dict(agg), "by_corpus": {c: dict(v) for c, v in by_corpus.items()},
             "ins_hist": ins_h, "del_hist": del_h, "sub_hist": sub_h, "per_file": per_file,
+            "ins_causes": ins_causes, "cause_examples": dict(cause_examples),
+            "causes_by_corpus": {c: collections.Counter(v)
+                                 for c, v in causes_by_corpus.items()},
         }
 
     def wer_of(c):
@@ -1123,6 +1298,48 @@ def main() -> int:
           "\nins = words we produced the reference lacks (hallucination axis;"
           " ~30% is numeral verbalization on this corpus — read the histogram)\n")
 
+    if args.insertion_causes:
+        # Ordered worst-understood last: `other` is the residue and the only
+        # bucket a decoder change can be blamed for.
+        order = ["contraction", "numeral", "no_ref_span", "split", "filler",
+                 "fragment", "duplicate", "other"]
+        print("-- insertion causes (heuristic over reference context; "
+              "`other` is the residue worth acting on)")
+        width = max(len(l) for l in labels)
+        head = "".join(f"{b:>13}" for b in order)
+        print(f"   {'arm':<{width}}{head}{'TOTAL':>9}")
+        for label in labels:
+            c = results[label]["ins_causes"]
+            row = "".join(f"{c.get(b, 0):>13}" for b in order)
+            print(f"   {label:<{width}}{row}{sum(c.values()):>9}")
+        for corpus in ("ami", "earnings21"):
+            if not any(results[l]["causes_by_corpus"].get(corpus) for l in labels):
+                continue
+            for label in labels:
+                c = results[label]["causes_by_corpus"].get(corpus)
+                if not c:
+                    continue
+                row = "".join(f"{c.get(b, 0):>13}" for b in order)
+                print(f"   {label + '/' + corpus:<{width + 11}}{row}{sum(c.values()):>9}")
+        for label in labels:
+            c = results[label]["ins_causes"]
+            tot = sum(c.values()) or 1
+            art = sum(c.get(b, 0) for b in
+                      ("contraction", "numeral", "no_ref_span", "split",
+                       "filler", "fragment"))
+            print(f"   {label}: convention/coverage {art} ({100 * art / tot:.0f}%), "
+                  f"duplicate {c.get('duplicate', 0)}, "
+                  f"other {c.get('other', 0)} ({100 * c.get('other', 0) / tot:.0f}%)")
+        last_label = labels[-1]
+        for bucket in order:
+            rows = results[last_label]["cause_examples"].get(bucket)
+            if not rows:
+                continue
+            print(f"\n   {bucket} ({last_label}):")
+            for r in rows[:4]:
+                print(f"     {r}")
+        print()
+
     for corpus in ("ami", "earnings21"):
         if not any(results[l]["by_corpus"].get(corpus) for l in labels):
             continue
@@ -1131,8 +1348,18 @@ def main() -> int:
             c = results[label]["by_corpus"].get(corpus)
             if not c:
                 continue
+            # `act` = the ACTIONABLE insertion subset (duplicate + residue).
+            # Printed unconditionally, and NOT behind --insertion-causes,
+            # because the pin gate reads this line and a gate that only
+            # works when someone remembers a flag is a default-off feature.
+            # The bare `ins` beside it stays for continuity of the record:
+            # two thirds of it is transcription convention and reference
+            # coverage, which is why it is TRACK and this is the RATCHET.
+            cc = results[label]["causes_by_corpus"].get(corpus, {})
+            act = cc.get("duplicate", 0) + cc.get("other", 0)
             print(f"   {label:<22} refW {c['n']:>7}  WER {wer_of(c) * 100:>6.2f}%  "
-                  f"sub {c['sub']:>6}  del {c['del']:>6}  ins {c['ins']:>6}")
+                  f"sub {c['sub']:>6}  del {c['del']:>6}  ins {c['ins']:>6}"
+                  f"  act {act:>6}")
     print()
 
     print("FILLER / BACKCHANNEL AXIS — the population every other scorer discards")
