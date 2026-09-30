@@ -27,6 +27,14 @@ content basis (filled pauses and casual forms folded, numbers scored
 separately), because Ultra writes fewer filled pauses than the verbatim
 reference expects. The earlier tables are unchanged.
 
+A seventh arm, NVIDIA Nemotron Speech Streaming 0.6B, a streaming model, was
+decoded over the same 27 files on 2026-09-28 and has its own section. What it
+measures is FluidInference's CoreML conversion of that model through FluidAudio,
+at a chunk size NVIDIA documents; which NVIDIA checkpoint the conversion carries
+is not established, and NVIDIA's own runtime was not run. Nothing
+already on this page was re-decoded for it, and its section carries a fresh
+blind-judge run, because the earlier judges cannot be mixed with a new one.
+
 Two streaming models, Voxtral Realtime 4B and Moonshine Streaming Medium, were
 probed on a single file after publication and are reported separately below.
 Neither was part of the measured comparison and their section says so.
@@ -63,7 +71,8 @@ gaps.
 **Realtime factors are not published.** The arms ran under different amounts of
 contention for the same hardware, so the per-file spread is a measurement of
 what else was running. An interleaved re-measure on an idle machine is owed
-before any latency claim, and none is made here.
+before any latency claim, and none is made here. The Nemotron section reports
+its own throughput under stated conditions and compares it with nothing.
 
 ## Corpora
 
@@ -442,6 +451,212 @@ in every one of the ten (6.56% against 7.66% mean).
 **Verdict: the replacement.** Fewer words dropped than any arm on this page,
 the same substitution and insertion counts as v3, and a small loss on number
 fidelity and on sentence ends at speaker changes, both measured above.
+
+## Nemotron Speech Streaming 0.6B
+
+Added 2026-09-28, revised the same day. NVIDIA's `nemotron-speech-streaming-en-0.6b`
+is an English-only, cache-aware streaming FastConformer-RNNT model (NVIDIA Open
+Model License). This section measures **FluidInference's CoreML conversion of it
+through FluidAudio's `StreamingNemotronAsrManager`**, not NVIDIA's own runtime,
+which was not run. FluidAudio is upstream v0.17.4, not the v0.15.6-based fork the
+other Swift arms pin; int8 encoder; audio fed 160 ms at a time; M1 Max, 32 GB,
+macOS 27.0.
+
+**Tier.** The headline arm runs at the **1,120 ms** chunk, one of the chunk sizes
+NVIDIA documents for the model (80, 160, 560 and 1,120 ms; the card's AMI figure,
+11.73%, is at 1.12 s on a different AMI basis, so it is not compared with anything
+here). The library's default is a 2,240 ms tier, which NVIDIA does not document;
+it is FluidAudio's throughput tier and is reported as a secondary row.
+
+**Which checkpoint is not established.** NVIDIA's `main` branch is the checkpoint
+released 2026-03-13; the January 2026 checkpoint is on the branch
+`nemotron-speech-streaming-jan2026`. The FluidInference repository was created on
+2026-01-12 and its 2,240, 1,120 and 560 ms tiers were re-converted on 2026-06-05
+from a checkpoint it does not name; the conversion script pins no revision. Both
+NVIDIA cards say the model outputs punctuation and capitalization, and the
+tokenizer in the conversion has the comma, period and question-mark tokens. We
+did not convert either checkpoint ourselves. Every result below is for this
+conversion, and it may not represent either NVIDIA checkpoint.
+
+All 27 files were decoded at both tiers. Both corpora are English, so no file was
+set aside as not applicable to an English-only model. Nothing already on this page
+was re-decoded. The comparator rows were re-scored today on the same normalizer
+build as the Nemotron rows and reproduce their published figures to within 12
+hypothesis words (the vendor batch arm reads 16.38% against a published 16.37%; the
+Unified, Ultra, same-build v3 and number-table rows reproduce exactly).
+
+Two comparators, by the rule at the top of the page: the like-for-like row for an
+external model is the Parakeet v3 FluidAudio batch arm, and the streaming
+comparator is Parakeet Unified, which ran through the same kind of streaming
+manager. The two pipeline rows are the product and are shown for reference.
+
+27 files, pooled, verbatim basis:
+
+| arm | hypothesis words | error rate | sub | del | ins | AMI | Earnings-21 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, MimicScribe pipeline | 170,227 | 15.58% | 8,905 | 13,704 | 5,225 | 23.29% | 9.15% |
+| Parakeet v3 int8-v2, MimicScribe pipeline, same build | 170,832 | 15.36% | 8,863 | 13,232 | 5,358 | 23.67% | 8.44% |
+| Parakeet v3 int8-v2, FluidAudio batch (the comparator) | 168,117 | 16.38% | 8,522 | 15,666 | 5,077 | 25.57% | 8.72% |
+| **Nemotron Speech Streaming 0.6B, 1,120 ms** | 161,818 | **17.28%** | 7,894 | 19,940 | 3,052 | 24.44% | 11.32% |
+| Nemotron Speech Streaming 0.6B, 2,240 ms (FluidAudio's off-spec speed tier) | 161,846 | 17.29% | 7,839 | 19,958 | 3,098 | 24.52% | 11.26% |
+| Parakeet Unified 0.6B, streaming | 156,463 | 19.15% | 6,369 | 25,052 | 2,809 | 25.69% | 13.71% |
+
+The two tiers are within 0.01 points of each other pooled and within 0.1 on either
+corpus, so the tier does not explain any result below; the rest of this section
+quotes the 1,120 ms arm.
+
+**Against the batch comparator it is 0.91 points worse, and the gap is
+deletion.** It deletes 4,274 more reference words while substituting 628 fewer and
+inserting 2,025 fewer. The gap is specific to the corpus. On AMI it is 1.14 points
+better than the comparator (24.44% against 25.57%, better on 13 of 16 meetings).
+On Earnings-21 it is 2.6 points worse (11.32% against 8.72%), worse on all 11
+calls, with 5,315 deletions against 1,839. That earnings-only gap is 3,476
+deletions: 57% are filled pauses and backchannels ("uh" +1,431, "um" +456) and the
+rest are mostly function words ("the" +102, "I" +93, "you" +92, "and" +79, "know"
++68). No stretch of audio went untranscribed on the two calls we checked, the
+longest and the one with the most deletions against the comparator (no gap of more
+than 5 seconds between rows on either); the deletions are single words spread
+through the calls.
+
+**Against Parakeet Unified it is 1.87 points better**, better on 23 of the 27
+files. Both are streaming models of the same size. Nemotron deletes 5,112 fewer
+reference words and substitutes 1,525 more; it is 1.25 points ahead on AMI and
+2.39 on Earnings-21. It is 1.71 points behind the Ultra pipeline the product ships
+(worse on 22 of 27 files) and 1.92 behind the same-build v3 pipeline.
+
+**Content basis.** The same re-score as the Ultra section (filled pauses removed,
+casual forms folded, number words and digits left out, each on both sides):
+
+| arm | error rate | sub | del | ins | AMI | Earnings-21 |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, MimicScribe pipeline | 13.63% | 7,423 | 10,262 | 4,901 | 20.68% | 7.65% |
+| Parakeet v3 int8-v2, MimicScribe pipeline, same build | 14.14% | 7,440 | 11,148 | 4,849 | 21.72% | 7.72% |
+| Parakeet v3 int8-v2, FluidAudio batch (the comparator) | 15.09% | 7,187 | 13,259 | 4,564 | 23.49% | 7.98% |
+| **Nemotron Speech Streaming 0.6B, 1,120 ms** | **15.09%** | 6,711 | 15,477 | 2,825 | 22.43% | 8.88% |
+| Nemotron Speech Streaming 0.6B, 2,240 ms | 15.11% | 6,667 | 15,508 | 2,878 | 22.56% | 8.82% |
+| Parakeet Unified 0.6B, streaming | 16.77% | 5,426 | 19,698 | 2,670 | 23.85% | 10.77% |
+
+On this basis the pooled rate ties the comparator (25,013 errors against 25,010),
+but that is two offsetting corpus results, not agreement. It is 1.06 points better
+on AMI and 0.90 worse on Earnings-21, and it still deletes 2,218 more reference
+words overall. The pooled gap to Unified is 1.68 points.
+
+On clean speech on AMI (no other speaker talking) it deletes at the comparator's
+rate, 5.0% against 5.0%; on overlapped speech it deletes 48.1% against 45.1%
+(Unified: 6.3% and 53.8%).
+
+**Numbers**, on the same build and scorer as the number table under "Parakeet
+Ultra", Earnings-21 quantities checked by value:
+
+| arm | scored | intact | wrong quantity | dropped | never said | doubled or spliced form |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, pipeline | 2,857 | 2,755 (96.4%) | 41 | 61 | 87 | 5 |
+| Parakeet v3 int8-v2, pipeline, same build | 2,861 | 2,769 (96.8%) | 42 | 50 | 91 | 11 |
+| Parakeet v3 int8-v2, batch (the comparator) | 2,859 | 2,747 (96.1%) | 44 | 68 | 84 | 10 |
+| **Nemotron Speech Streaming 0.6B, 1,120 ms** | 2,858 | **2,751 (96.3%)** | 40 | 67 | 132 | 20 |
+| Nemotron Speech Streaming 0.6B, 2,240 ms | 2,857 | 2,748 (96.2%) | 41 | 68 | 130 | 20 |
+| Parakeet Unified 0.6B | 2,843 | 2,687 (94.5%) | 49 | 107 | 88 | 6 |
+
+It keeps as many quantities intact as the comparator (2,751 against 2,747) and has
+the highest never-said and doubled-or-spliced counts in the number tables on this
+page, all of which run under one normalizer. That normalizer was built for
+Parakeet's output style, and the model's raw text is different: it spells years
+out ("twenty twenty" 207 times in the earnings calls, never as digits) and writes
+few commas. Scored on the rows as decoded, without the
+normalizer, the 1,120 ms arm reads 2,692 intact of 2,851 (94.4%), 60 wrong, 99
+dropped, 168 never said and no splices. So the normalizer turns 59 more
+quantities intact, cuts the dropped by 32 and the never-said by 36, and creates
+the 20 splices. Eleven of those 20 are a day followed by a year ("30 2020"), which read
+like dates whose comma the transcript never wrote. The never-said count is mostly
+cardinals (73) and ordinals (23, of which 16 are "first"); Parakeet's batch arm
+has 55, 14 and 10 in the same classes. We did not separate how much of the rest is
+the model and how much is the normalizer meeting text it was not tuned on.
+
+**Punctuation is domain-specific and sparse.** Words ending in a period, question
+mark or exclamation mark, per 1,000 words, in the rows as decoded
+(`scripts/bakeoff/punct_recount.py`):
+
+| arm | AMI | Earnings-21 |
+|---|---:|---:|
+| Nemotron, 1,120 ms | 0.4 (30 of 68,535 words) | 13.8 (1,320 of 95,846) |
+| Parakeet v3, FluidAudio batch | 99.0 | 48.1 |
+| Parakeet Unified | 9.5 | 51.9 |
+
+On AMI it writes almost no sentence ends. On Earnings-21 it writes some, under a
+third as many as the comparator. On one meeting, IS1009a, the terminal-punctuation
+scorer from the probes section finds none of the 133 reference sentence ends its
+words line up with marked (recall 0.000). That is one file. We did not establish
+whether the sparse marks come from the checkpoint, the conversion or the decoder;
+NVIDIA's cards say the model writes punctuation and this transcript mostly does
+not on meeting speech. Speaker attribution needs sentence ends, which is why
+Unified's sparse marks disqualified it above.
+
+Side checks, each one line. Tier: the 2,240 ms arm above is the whole comparison.
+One meeting (IS1009a): deletion on clean speech 4.3% for Nemotron at 1,120 ms
+against 5.0% for the batch comparator, 3.1% against 4.5% with fillers and
+backchannels removed, error rate 18.2% against 21.8%. Speed: 30.0 times real time
+in aggregate at 1,120 ms (2,262 s for 18.83 h) and 32.9 at 2,240 ms (2,062 s), per
+file 20.6 to 33.3 and 17.3 to 42.5, on a machine with other jobs running, so no
+comparison with another arm is made.
+
+**The blind judge.** The two earlier judges were `gemini-3.1-flash-lite` and
+`anthropic/claude-haiku-4.5`, and their grades cannot be mixed with a third
+judge's. So four arms were graded again by one judge, `gemini-3.8-flash-medium`
+through the `agy` CLI, over the same 80 windows as run 4 (all 92 window and pass
+ids match), with balanced letters, the same excerpt cap and the same anchor check.
+The arms are the Ultra pipeline, the vendor batch comparator, Parakeet Unified and
+Nemotron at 1,120 ms; the 2,240 ms arm was not judged. The CLI sets no temperature
+or thinking budget, so this run's levels are not comparable with run 4's, and the
+run 4 tables are unchanged. The anchor check dropped 15 windows in which at
+least one arm's excerpt was not the same stretch of the meeting (Unified in 9, Nemotron in 7, batch in 5, Ultra in 3),
+leaving 65 windows and 73 calls, against run 4's 68 and 78.
+One call returned an empty turn at the CLI's own limit and was asked again; none failed in the end.
+
+Single judge, 65 windows. Lower is better except readability; wrong figures
+are event counts and no ordering is claimed from them:
+
+| arm | wrong figures (events) | wrong names / terms | dropped | added | readability |
+|---|---:|---:|---:|---:|---:|
+| Parakeet Ultra, pipeline | 8 | 0.42 | **0.55** | 0.08 | **4.28** |
+| Parakeet v3, FluidAudio batch | 7 | 0.55 | 0.66 | 0.11 | 4.22 |
+| **Nemotron Speech Streaming 0.6B, 1,120 ms** | 3 | 0.55 | 0.85 | **0.05** | 3.10 |
+| Parakeet Unified 0.6B | 10 | **0.37** | 0.83 | 0.06 | 3.88 |
+
+Nemotron adds the least content and has the fewest wrong-figure events, ties the
+comparator on wrong names, and drops the most (0.85 against the comparator's 0.66,
+Unified's 0.83). The wrong-figure events are all on the earnings calls (3 for
+Nemotron, 7 for the comparator, 6 for Ultra, 10 for Unified; on AMI there are 2 in
+all, both Ultra's), and that column is a handful of events, not a ranking. On its
+own 12 repeated windows the judge matched itself on every cell for wrong figures,
+names and added content, on 91% for dropped content and 84% for readability
+(chance-corrected: figures 1.00, names 1.00, dropped 0.68, added 1.00, readability
+0.76). By prompt position the added-content means are 0.05, 0.07, 0.05 and 0.10 for
+A to D. There is no second-vendor judge for this run, so a reader cannot separate a
+property of the transcripts from a property of this judge.
+
+**Caveats.**
+
+- **English only.** It cannot serve the 25-language product; this corpus is
+  English.
+- **The FluidAudio conversion, not NVIDIA's runtime.** FluidAudio's documentation
+  says WER parity with NVIDIA's own tuning is a tracked follow-up; its own figure
+  for the 2,240 ms tier is 2.46% on LibriSpeech test-clean. A result through
+  NVIDIA's runtime, or for the March checkpoint if the conversion carries the
+  January one (or the reverse), may read differently.
+- **The deletion check is two files**, and the number-normalizer attribution above
+  is not separated further.
+- **Readability measures output format here.** The judge's notes mention missing
+  punctuation on 48 of its 92 Nemotron cells, so that column says what the
+  transcript looks like and is not used in the verdict.
+
+**Verdict, scoped: not a replacement.** For the FluidAudio CoreML port at 1,120 ms,
+under this page's normalizer and scorer stack, it deletes more than the model the
+product ships and than the vendor batch arm on the verbatim basis (worse on
+Earnings-21, better on AMI, level on the pooled content basis), writes almost no
+sentence ends on AMI, and has the highest never-said and spliced quantity counts
+in the number tables. It is a better streaming recognizer than Parakeet Unified on
+this corpus. That is a statement about this conversion and this scoring; NVIDIA's
+own runtime was not run.
 
 ## Two streaming models — probes, not arms
 
@@ -952,6 +1167,22 @@ The probe package pins the same FluidAudio fork revision the app pins
 URL, so `swift run` resolves it on any machine with network access.
 
 ```bash
+# 3c. Nemotron Speech Streaming, 1,120 ms tier (headline; repeat with
+#     nemotron_coreml_2240ms and --arm nemotron-2240 for the secondary row).
+#     --models-dir is the tier directory itself
+#     (FluidInference/nemotron-speech-streaming-en-0.6b-coreml at revision
+#     e673531c, folder nemotron_coreml_1120ms); the runner never
+#     downloads. The package pins upstream FluidAudio v0.17.4, so it is built
+#     apart from step 3's package. Same stop-on-mismatch, retry and resume
+#     behavior as step 3b.
+swift build -c release --package-path scripts/nemotron_probe
+scripts/nemotron_probe/.build/release/nemotron_probe \
+  --arm nemotron-1120 --out benchmark/output/bakeoff-nemotron-1120 \
+  --models-dir <model directory>/nemotron_coreml_1120ms \
+  --audio <file.wav> [--audio <file.wav> ...]
+```
+
+```bash
 # 4. Cohere. Vendor defaults; the loop patch re-decodes only the six chunks
 #    that ran into a repeated token.
 python3 scripts/bakeoff/run_cohere_transcribe.py --out benchmark/output/bakeoff-cohere
@@ -1034,6 +1265,31 @@ python3 scripts/bakeoff/judge_agreement.py \
 ```
 
 ```bash
+# 6d. The Nemotron section. Every arm through step 6b on one build, then the
+#     number scorer, the content basis and the judge on those copies.
+for arm in <nemotron dir> <unified dir> <batch dir> <ultra pipeline dir>; do
+  python3 scripts/bakeoff/itn_normalize_arm.py $arm <normalized>/$(basename $arm)
+done
+python3 scripts/score_corpus_wer.py --arms <ultra> <pipeline> <batch> <unified> <nemotron> \
+  --labels ultra_pipe v3_pipe v3_batch unified nemotron --per-file --stratify
+python3 scripts/score_content_wer.py "ultra=<dir>" "batch=<dir>" "unified=<dir>" "nemotron=<dir>"
+python3 scripts/score_number_fidelity.py --corpus <normalized>/nemotron/per-file --json-out numbers_nemotron.json
+# The judge: one judge, four arms, through the agy CLI (a Gemini subscription,
+# no API key). Same seed and windows as run 4. Each call runs in a scratch
+# directory and is killed after 15 minutes; concurrency up to 10 is allowed
+# for this provider only. A row whose call failed is kept as a parse failure
+# and is re-asked by deleting it from grades.jsonl and re-running with --resume.
+python3 scripts/bakeoff/judge_transcripts.py \
+  --arms ultra=<norm>/ultra batch=<norm>/batch unified=<norm>/unified nemotron=<norm>/nemotron \
+  --provider agy --model gemini-3.8-flash-medium --concurrency 6 \
+  --balanced-positions --max-excerpt-ratio 1.5 --out judge_agy
+# Anchor check, per-window means, event counts, self-agreement and position
+# effect for ONE run (judge_agreement.py needs two):
+python3 scripts/bakeoff/judge_single_summary.py judge_agy/grades.jsonl --max-anchor-wer 1.0
+python3 scripts/bakeoff/punct_recount.py nemotron=<dir> batch=<dir> unified=<dir>
+```
+
+```bash
 # 6b. Normalize a raw arm's rows once, line for line, through the same pass the
 #     saved transcript goes through, so the number scorer and the judge read
 #     every arm on one basis. The WER scorer does this itself at scoring time.
@@ -1065,7 +1321,9 @@ two scorers on the same basis. The number-fidelity table was re-scored on
 2026-09-03, on one binary; that section says so and carries the caveat. The
 Parakeet Unified arm was decoded and scored on 2026-09-25 by the scorers in
 this directory, on a later build of the normalizer; its section says what that
-moves.
+moves. The Nemotron arm was decoded and scored on 2026-09-28 the same way, with
+the comparator rows re-scored on the same build (its section says by how much
+they moved) and a fresh judge run.
 
 **Published** is the date the model's Hugging Face repository was created.
 
@@ -1082,6 +1340,7 @@ moves.
 | Voxtral Realtime 4B (probe, 1 file, 2026-09-06) | `mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit` | 4-bit, 480 ms delay | 2026-02-04 | MLX on Apple Silicon GPU |
 | Parakeet Ultra, MimicScribe pipeline (arm, 27 files, 2026-09-27) | `moondream/parakeet-ultra` via `FluidInference/parakeet-ultra-coreml` | CoreML `95eaa59a`, int8 encoder; app `964e6af11` | 2026-09-22 | CoreML on Apple Silicon, same pipeline as the v3 rows |
 | Parakeet Unified 0.6B (arm, 27 files, 2026-09-25) | `nvidia/parakeet-unified-en-0.6b` via `FluidInference/parakeet-unified-en-0.6b-coreml`, int8 | streaming encoder `70_7_7` weights `f145c8da…`, offline encoder `f984b815…`; FluidAudio same | 2026-04-07 | CoreML on Apple Silicon, `StreamingUnifiedAsrManager`, 1,120 ms |
+| Nemotron Speech Streaming 0.6B (arm, 27 files, 2026-09-28) | `nvidia/nemotron-speech-streaming-en-0.6b` via `FluidInference/nemotron-speech-streaming-en-0.6b-coreml`, int8 encoder; the checkpoint behind the conversion is not stated (NVIDIA `main` is 2026-03-13, branch `nemotron-speech-streaming-jan2026` is the January one) | headline: 1,120 ms tier, encoder weights `409df110…`; secondary: 2,240 ms tier, `0c67d14d…`; CoreML repository revision `e673531c…`; FluidAudio upstream `21493f8dac5a97e65742e6ff26f42f164c2fda0f` (v0.17.4) | 2025-12-17 | CoreML on Apple Silicon, library-default compute units, `StreamingNemotronAsrManager`, M1 Max |
 | Moonshine Streaming Medium (probe, 1 file, 2026-09-21) | `moonshine-ai/moonshine-streaming-medium`, vendor build `quantized_26_08_21` | vendor download, not the Hugging Face weights; `moonshine-voice` 0.1.5, 200 ms chunks | 2026-01-06 | ONNX Runtime 1.23.2, CPU |
 
 Both CoreML encoder files come from `FluidInference/parakeet-tdt-0.6b-v3-coreml`.
@@ -1105,7 +1364,9 @@ Arm output directories (not redistributed; each holds one JSON of per-file
 transcripts): `benchmark/output/bakeoff-<arm>/per-file/`, the patched Cohere
 run at `benchmark/output/audit-cohere-loopfix`, the NeMo arms at
 `benchmark/output/bakeoff-nemo-{v2,v3}`, the Parakeet Unified arm at
-`benchmark/output/bakeoff-unified-1120`. The MimicScribe pipeline arm is
+`benchmark/output/bakeoff-unified-1120`, the Nemotron arm at
+`benchmark/output/bakeoff-nemotron-1120` (headline) and `bakeoff-nemotron-2240`
+(its judge run at `benchmark/output/bakeoff-judge-agy-gemini-3.8-flash-medium`). The MimicScribe pipeline arm is
 `benchmark/output/swift_pipeline_2026-08-30T021253Z`, decoded by app commit
 `5c847cf5`, which shipped as v1.0.0-rc.27. The Parakeet Ultra arm is
 `benchmark/output/swift_pipeline_2026-09-27T213110Z`, a cold decode by app

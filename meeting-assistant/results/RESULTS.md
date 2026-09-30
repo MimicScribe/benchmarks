@@ -13,6 +13,7 @@ Run date: 2026-07-14 (discovery, forward-looking, execution, action-items subset
 | Discovery composite (26 scenarios × 3 runs, 2026-07-14) | **90%** (was 96% on Gemini 3 Flash, 22 scenarios) |
 | Execution composite (28 scenarios × 3 runs, 2026-07-14) | **91%** (was 97% on Gemini 3 Flash) |
 | Action-items composite (35 scenarios × 3 runs, 2026-07-14) | **90%** (suite expanded from 13 scenarios) |
+| Live action items kept in the saved list (138 AMI meetings, 2026-09-28) | **93%** (was 55%) |
 | Forward-looking composite (3 scenarios × 3 runs, 2026-07-14) | 87% |
 | Hallucination tag composite (2026-04-12, 5 runs) | 97% |
 | Long-meetings tag composite (2026-04-12, 5 runs) | 96% |
@@ -267,6 +268,23 @@ The action-items suite nearly tripled since the last published run (13 → 35 sc
 Across the run: 236 action items extracted over 105 runs, 195 with resolved due dates.
 
 **Known weakness:** on ambiguous present-intent phrasing ("I'm working on X now"), the model occasionally closes an item early when the surrounding discussion pivots. Because the list is persistent and re-evaluated each refresh, these recover on the next pass rather than vanishing.
+
+### Live items kept
+
+_Measured 2026-09-28 on Gemini 3.1 Flash Lite._
+
+Action items appear on screen during the call. When the meeting ends, a second pass writes the saved list. An item you watched appear live and then can't find afterwards looks like the app lost it. This measures how often that happens.
+
+**Corpus:** the [AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/), 138 meetings that produced at least one live action item. Each meeting is replayed through the live action-item list from its reference transcript, so transcription and speaker errors are out of this measurement. The open live list at the end of the meeting is compared with the saved list, and a Gemini 3.1 Flash Lite judge marks which live items the saved list carries, in any wording.
+
+| | live items kept | meetings that lost at least one |
+|---|---:|---:|
+| before | 253 / 460 (55%) | 95 / 138 |
+| **now** | **429 / 460 (93%)** | **17 / 138** |
+
+The saved list now starts from what you saw live. An item still drops when the rest of the meeting shows it was cancelled or already done.
+
+**The trade:** the saved list is longer. On in-room meetings it now carries more items that were only raised in passing.
 
 ## Timezone Resolution
 

@@ -1,3 +1,4 @@
 .serena/
 cached-dumps/
 .DS_Store
+.build/

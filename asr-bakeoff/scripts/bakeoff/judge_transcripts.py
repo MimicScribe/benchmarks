@@ -225,6 +225,7 @@ import os
 import random
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -1110,6 +1111,65 @@ def call_gemini_judge(
 # rescue; those rows are written with `grades: {}` and a `parse_error` note
 # rather than silently dropped.
 
+DEFAULT_AGY_MODEL = "gemini-3.8-flash-medium"
+AGY_KILL_AFTER_S = 900.0  # a hung `agy` call is killed, not waited on
+
+
+def call_agy_judge(
+    user_message: str,
+    *,
+    model: str,
+    limiter: RateLimiter,
+) -> tuple[dict, dict, int]:
+    """One judge call through the `agy` CLI (a Gemini subscription, no API key).
+    Returns (parsed_json, usage, latency_ms) like the API providers; usage is
+    empty because the CLI does not report tokens. The CLI cannot set
+    temperature or a thinking budget, so the model id carries the effort
+    (`gemini-3.8-flash-medium`). The call runs in a scratch cwd, is killed
+    after AGY_KILL_AFTER_S, and is retried twice on a timeout or a non-zero
+    exit. Raises `ValueError` on an unparseable body (counted as a parse
+    failure by the caller)."""
+    last_err = "no attempt"
+    for attempt in range(1, 4):
+        limiter.wait_slot()
+        with tempfile.TemporaryDirectory() as cwd:
+            schema_path = os.path.join(cwd, "schema.json")
+            with open(schema_path, "w") as fh:
+                json.dump(RESPONSE_SCHEMA, fh)
+            t0 = time.monotonic()
+            try:
+                r = subprocess.run(
+                    ["agy", "-p", JUDGE_SYSTEM_INSTRUCTION + "\n\n" + user_message,
+                     "--model", model, "--output-format", "json",
+                     "--json-schema", schema_path, "--print-timeout", "5m",
+                     "--disable-slash-commands"],
+                    capture_output=True, text=True, timeout=AGY_KILL_AFTER_S, cwd=cwd)
+            except subprocess.TimeoutExpired:
+                last_err = f"agy call hung past {AGY_KILL_AFTER_S:.0f}s, killed"
+                print(f"  ! {last_err} (attempt {attempt})", file=sys.stderr)
+                continue
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        if r.returncode != 0:
+            last_err = f"agy rc={r.returncode}: {r.stderr[-200:]}"
+            print(f"  ! {last_err} (attempt {attempt})", file=sys.stderr)
+            continue
+        try:
+            parsed = json.loads(r.stdout).get("structured_output")
+        except json.JSONDecodeError:
+            raise ValueError(f"agy envelope is not JSON: {r.stdout[:300]}")
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("grades"), list):
+            # An empty turn (the CLI's own print-timeout hit, `response: ""`) is
+            # retried like a non-zero exit; a body that is present but not the
+            # schema is not.
+            if not (r.stdout and '"response":""' in r.stdout.replace(" ", "")):
+                raise ValueError(f"agy returned no structured grades: {r.stdout[:300]}")
+            last_err = "agy returned an empty turn"
+            print(f"  ! {last_err} (attempt {attempt})", file=sys.stderr)
+            continue
+        return parsed, {}, latency_ms
+    raise ValueError(f"agy judge failed after 3 attempts: {last_err}")
+
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -1501,12 +1561,16 @@ def run_job(job: JudgeJob, arms: dict[str, Path], args: argparse.Namespace,
                         for label in sorted(label_of_arm)]
     user_message = build_user_message(job.window.ref_excerpt, labeled_excerpts)
     parse_error: Optional[str] = None
-    if args.provider == "openrouter":
+    if args.provider in ("openrouter", "agy"):
         try:
-            parsed, usage, latency_ms = call_openrouter_judge(
-                user_message, model=args.model_resolved, temperature=args.temperature,
-                max_output_tokens=args.max_output_tokens, limiter=limiter,
-            )
+            if args.provider == "agy":
+                parsed, usage, latency_ms = call_agy_judge(
+                    user_message, model=args.model_resolved, limiter=limiter)
+            else:
+                parsed, usage, latency_ms = call_openrouter_judge(
+                    user_message, model=args.model_resolved, temperature=args.temperature,
+                    max_output_tokens=args.max_output_tokens, limiter=limiter,
+                )
         except ValueError as e:
             n = parse_failures.bump()
             parse_error = str(e)[:400]
@@ -2010,7 +2074,7 @@ def main() -> int:
                           "per process, so the same --seed does NOT reproduce the same letters "
                           "in a new process. --per-corpus / --repeat-fraction / --seed / "
                           "--file-ids / --min-confidence are all ignored in this mode.")
-    ap.add_argument("--provider", choices=["gemini", "openrouter"], default="gemini",
+    ap.add_argument("--provider", choices=["gemini", "openrouter", "agy"], default="gemini",
                      help="gemini = Google generativelanguage; openrouter = any "
                           "OpenAI-compatible model on openrouter.ai (the second, non-Google "
                           "judge). Same prompt, same schema, same temperature either way.")
@@ -2028,7 +2092,8 @@ def main() -> int:
     ap.add_argument("--thinking", default="minimal")
     ap.add_argument("--temperature", type=float, default=0.1)
     ap.add_argument("--max-output-tokens", type=int, default=2048)
-    ap.add_argument("--concurrency", type=int, default=1, choices=[1, 2])
+    ap.add_argument("--concurrency", type=int, default=1, choices=range(1, 11),
+                    help="1-2 for the API providers; up to 10 for agy")
     ap.add_argument("--min-interval", type=float, default=1.0,
                      help="minimum seconds between call starts, shared across all workers")
     ap.add_argument("--max-excerpt-ratio", type=float, default=DEFAULT_MAX_EXCERPT_RATIO,
@@ -2068,9 +2133,14 @@ def main() -> int:
     if args.no_excerpt_cap:
         args.max_excerpt_ratio = 0.0
     if args.model is None:
-        args.model = DEFAULT_OPENROUTER_MODEL if args.provider == "openrouter" else DEFAULT_MODEL
-    # Aliases are Gemini-only; an OpenRouter id (`vendor/model`) passes through.
-    args.model_resolved = args.model if args.provider == "openrouter" else resolve_model(args.model)
+        args.model = {"openrouter": DEFAULT_OPENROUTER_MODEL,
+                      "agy": DEFAULT_AGY_MODEL}.get(args.provider, DEFAULT_MODEL)
+    # Aliases are Gemini-only; an OpenRouter id (`vendor/model`) and an agy
+    # model id pass through.
+    args.model_resolved = (args.model if args.provider in ("openrouter", "agy")
+                           else resolve_model(args.model))
+    if args.provider != "agy" and args.concurrency > 2:
+        sys.exit("--concurrency above 2 is only for --provider agy")
     if args.provider == "gemini" and not GEMINI_API_KEY:
         sys.exit("no GEMINI_API_KEY (env var, or .env in this worktree or the main checkout)")
     if args.provider == "openrouter" and not OPENROUTER_API_KEY:

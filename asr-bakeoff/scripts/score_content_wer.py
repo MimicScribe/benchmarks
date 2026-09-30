@@ -54,6 +54,10 @@ for name,p in arms:
         for b,(rf,hy) in {'v':(ref,hyp),'n':(fold(ref,False),fold(hyp,False)),'c':(fold(ref,True),fold(hyp,True)),
                           'x':(nonum(fold(ref,True)),nonum(fold(hyp,True)))}.items():
             s=S.score(rf,hy); e=s['sub']+s['del']+s['ins']
+            for k in ('sub','del','ins'): tot[b][k]+=s[k]
             tot[b]['e']+=e; tot[b]['n']+=len(rf); tot[b][corpus+'e']+=e; tot[b][corpus+'n']+=len(rf)
     w=lambda b,k='': 100*tot[b][k+'e']/max(1,tot[b][k+'n'])
     print(f"{name:28} {w('v'):8.2f}% {w('n'):8.2f}% {w('c'):8.2f}% {w('x'):18.2f}%   {w('x','ami'):6.2f}% / {w('x','earnings21'):6.2f}%")
+    x = tot['x']
+    print(f"{'':28} content-no-numbers sub / del / ins: {x['sub']:,} / {x['del']:,} / {x['ins']:,}  "
+          f"({x['n']:,} reference words, {x['e']:,} errors)")

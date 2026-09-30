@@ -1,6 +1,6 @@
 # ASR Model Bake-off
 
-Four acoustic models decoded over one 27-file public corpus, through their own runtimes and through ours, and graded two ways: word error rate, and a blind rubric judge reading each transcript against the human reference. The report is [RESULTS.md](RESULTS.md); the corpus, its licences and its per-file hashes are [CORPUS.md](CORPUS.md).
+Four acoustic models decoded over one 27-file public corpus, through their own runtimes and through ours, and graded two ways: word error rate, and a blind rubric judge reading each transcript against the human reference. Later arms — Parakeet Unified, Parakeet Ultra and NVIDIA Nemotron Speech Streaming (2026-09-28, English-only, streaming) — were decoded over the same corpus and have their own dated sections. The report is [RESULTS.md](RESULTS.md); the corpus, its licences and its per-file hashes are [CORPUS.md](CORPUS.md).
 
 Dated and closed. Measured 2026-09-01 and published as a snapshot of what existed then, not as a leaderboard — nothing here is re-run when a new model ships, and no release is gated on it.
 

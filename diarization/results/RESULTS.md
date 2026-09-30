@@ -1,10 +1,22 @@
 # MimicScribe Diarization Benchmark Results
 
-Pipeline: Parakeet TDT 0.6B ASR + Pyannote Community-1 diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
+Pipeline: Parakeet TDT v3 ASR + Pyannote Community-1 diarization with NVIDIA Nemotron 3 Diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
 
-Run date: 2026-08-29
+Run date: 2026-09-29 (previous run: 2026-08-29)
 
-## What's new in this update
+## What's new in the 2026-09-29 update
+
+**With NVIDIA Nemotron 3 Diarization: 57-file aggregate SAA 98.4% → 98.9%, NOTSOFAR-1 91.7% → 98.8%.** The shipping build runs Nemotron 3 alongside MimicScribe's own diarizer and lets it correct lines and speakers MimicScribe was unsure about, while MimicScribe keeps its speakers and names. Per corpus: AMI 99.1%, DiPCo 99.0%, VoxConverse 99.0%, Earnings-21 98.2%, SCOTUS 99.4%. All four diarization gates passed on the 57 files (phantom rows 9 → 9, no merge regressions; the hidden "Unknown" bucket shrank from 771 to 116 segments).
+
+**Current main, no Nemotron: aggregate SAA 98.3% → 98.4%** on the same 57 files. Per corpus: AMI 98.1% to 98.2%, DiPCo 97.6% to 97.9%, VoxConverse 97.0% to 97.1%, Earnings-21 and SCOTUS unchanged at 98.0% and 99.4%. DER fell on four of five corpora (false alarm fell on every one): AMI 26.1% to 24.9%, DiPCo 29.5% to 28.9%, Earnings-21 15.6% to 14.4%, VoxConverse 14.8% to 14.5%, SCOTUS unchanged at 1.5%.
+
+**A new corpus: NOTSOFAR-1 evaluation set**, 80 far-field meetings of 3 to 7 speakers (CC BY 4.0, [arXiv 2501.17304](https://arxiv.org/abs/2501.17304)). MimicScribe was not tuned on it. On this room MimicScribe scores **91.7% SAA**, well below the other corpora, because single-channel far-field audio makes it merge speakers.
+
+The turn-level, phantom-speaker, latency and DER-breakdown sections below are from the 2026-08-29 run.
+
+## Previous update: 2026-08-29
+
+### What changed on 2026-08-29
 
 **Aggregate SAA 98.1% → 98.3%** on the same 57 files (98.2% → 98.3% on the 52-file basis). Confusion — the component of the error that measures attribution — fell from 1.9% to 1.7% of reference time, and fell on every corpus: AMI 2.1% to 1.9%, DiPCo 2.6% to 2.4%, Earnings-21 2.1% to 2.0%, SCOTUS 0.8% to 0.6%, VoxConverse 3.1% to 3.0%.
 
@@ -16,16 +28,19 @@ Substantial turns improved: 41 of the 2,987 reference turns of ten seconds or lo
 
 **SAA = 1 − confusion rate.** Percentage of speech time attributed to the correct speaker.
 
-| Corpus | Files | Pyannote C1 SAA | MimicScribe SAA | Speedup |
-|--------|------:|----------------:|----------------:|--------:|
-| Earnings-21 | 11 | 98.1% | **98.0%** | 3.7x |
-| VoxConverse | 20 | 95.9% | **97.0%** | 4.1x |
-| SCOTUS | 5 | 99.2% | **99.4%** | 5.4x |
-| AMI | 16 | 97.0% | **98.1%** | 3.7x |
-| DiPCo | 5 | — | **97.6%** | — |
-| **Aggregate** | **57** | — | **98.3%** | — |
+| Corpus | Files | Pyannote C1 SAA (2026-08-29 run, reference not re-run) | MimicScribe SAA, 2026-08-29 | MimicScribe SAA, 2026-09-29 | With Nemotron 3 Diarization | Speedup |
+|--------|------:|----------------:|----------------:|----------------:|----------------:|--------:|
+| Earnings-21 | 11 | 98.1% | 98.0% | 98.0% | **98.2%** | 3.7x |
+| VoxConverse | 20 | 95.9% | 97.0% | 97.1% | **99.0%** | 4.1x |
+| SCOTUS | 5 | 99.2% | 99.4% | 99.4% | **99.4%** | 5.4x |
+| AMI | 16 | 97.0% | 98.1% | 98.2% | **99.1%** | 3.7x |
+| DiPCo | 5 | — | 97.6% | 97.9% | **99.0%** | — |
+| **Aggregate** | **57** | — | **98.3%** | **98.4%** | **98.9%** | — |
+| NOTSOFAR-1 eval (not tuned on) | 80 | not run | — | 91.7% | **98.8%** | — |
 
-On the 52-file basis used before DiPCo was added, the aggregate is **98.3%**. Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters; the reference has not yet been run on DiPCo.
+The "With Nemotron 3 Diarization" column is the shipping build (CPU inference). The 2026-09-29 column is the same main without Nemotron.
+
+On the 52-file basis used before DiPCo was added, the aggregate is **98.3%** (2026-08-29 run; the 2026-09-29 52-file figure is not recomputed here). Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters; the reference has not yet been run on DiPCo or NOTSOFAR-1. Speedup is from the 2026-08-29 run.
 
 Over-segmentation is preferred over under-segmentation. Merging two speakers in the UI is a single correction; splitting one speaker requires manual per-segment reassignment.
 
@@ -120,19 +135,20 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 | [SCOTUS](https://www.oyez.org) | Supreme Court oral arguments | 5 | ~7.5 hrs | 10–12 |
 | [AMI](https://groups.inf.ed.ac.uk/ami/corpus/) | Meeting recordings (IHM-mix) | 16 | ~9 hrs | 4 |
 | [DiPCo](https://arxiv.org/abs/1909.13447) | Dinner-party conversations | 5 | ~2.5 hrs | 4 |
+| [NOTSOFAR-1](https://arxiv.org/abs/2501.17304) (eval set, CC BY 4.0; not tuned on) | Far-field single-channel meetings | 80 | ~8.3 hrs | 3–7 |
 
 ## Methodology
 
 - **Collar**: 0.25s — a quarter-second on each side of every reference boundary is excluded from scoring (standard practice; boundary placement inside the collar is not measured)
 - **Scoring**: [pyannote.metrics](https://pyannote.github.io/pyannote-metrics/) DiarizationErrorRate, `skip_overlap=False` — overlapping speech is scored, not excluded
-- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 0.5s; a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
-- **Diarization**: Pyannote Community-1 via [FluidAudio](https://github.com/FluidInference/FluidAudio) CoreML
-- **ASR**: Parakeet TDT 0.6B via FluidAudio CoreML
+- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 1.0s (turns of 2s or more are scored; the 2026-08-29 text said 0.5s, but `over_split_diagnostic.py` uses 1.0s); a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
+- **Diarization**: Pyannote Community-1 via [FluidAudio](https://github.com/FluidInference/FluidAudio) CoreML, with NVIDIA Nemotron 3 Diarization (FluidAudio CoreML, CPU)
+- **ASR**: Parakeet TDT 0.6B v3 via FluidAudio CoreML. Every run behind these numbers used v3; the app now ships Parakeet Ultra, which has not been scored here.
 - **LLM**: Gemini 3.1 Flash Lite (temp 0.1, thinking minimal)
 
 ## Reproducibility
 
-The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). This run was produced at `parakeet-transcriber` commit `5c847cf5` with default parameters.
+The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). The 2026-08-29 run was produced at `parakeet-transcriber` commit `5c847cf5` with default parameters. The 2026-09-29 runs were produced at commit `db5059662` (without Nemotron) and `9677ee3be` (with Nemotron 3, the shipping configuration).
 
 ```
 swift build -c release
@@ -156,6 +172,7 @@ Every published run of this benchmark, oldest to newest. The full text of each v
 | 2026-06-11 | 52 | 97.9% | Phantom-cluster dissolution; recovery of quiet speakers absorbed into an acoustically similar neighbor |
 | 2026-07-17 | 57 | 98.1% | DiPCo (dinner-party) corpus added; turn-opening phantom routing; interjection-cluster dissolution refined; unplaceable fragments park in a hidden "Unknown" bucket |
 | 2026-08-25 | 57 | 98.1% | ASR recovery work: missed speech 8.2% → 6.6% with confusion flat at 1.9%; short-turn attribution up in every bucket |
-| 2026-08-29 | 57 | **98.3%** | Word timings no longer overrun the audio that produced them: confusion 1.9% → 1.7% with missed speech 6.6% → 6.8%; substantial-turn misattribution 44 → 41 of 2,987; phantom rows 10 → 9 |
+| 2026-08-29 | 57 | 98.3% | Word timings no longer overrun the audio that produced them: confusion 1.9% → 1.7% with missed speech 6.6% → 6.8%; substantial-turn misattribution 44 → 41 of 2,987; phantom rows 10 → 9 |
+| 2026-09-29 | 57 | **98.4%** | Current main: DER fell on four of five corpora (AMI 26.1% → 24.9%); NOTSOFAR-1 (80 meetings) added at 91.7%, not tuned on. With NVIDIA Nemotron 3 Diarization: **98.9%**, NOTSOFAR-1 98.8% |
 
 Aggregates are comparable only within the same file basis: 58 → 52 removed the Podcast corpus (May 2026); 52 → 57 added DiPCo (July 2026). On the shared 52-file basis, the 2026-07-17 and 2026-08-25 runs both score 98.2% and the 2026-08-29 run scores 98.3%.
