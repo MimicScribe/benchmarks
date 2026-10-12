@@ -44,6 +44,49 @@ On the 52-file basis used before DiPCo was added, the aggregate is **98.3%** (20
 
 Over-segmentation is preferred over under-segmentation. Merging two speakers in the UI is a single correction; splitting one speaker requires manual per-segment reassignment.
 
+## Live speaker labels (during the call)
+
+_Measured 2026-10-06 on build `2ed6b4964`._
+
+The table above scores the finished transcript. This section scores what you see while the meeting is still going: the speaker label on each line of the live transcript, as it stood on screen at that moment.
+
+**During the call, speaker attribution accuracy was 97.3%**, on the same measure as the SAA table above, against the same human reference timelines. Counted only over the speech that already carried a speaker label, **96.6% of it was under the right speaker.**
+
+| Files | Voice profiles | Hours | SAA during the call | Of labeled speech, right speaker | SAA, last screen before stop | Speech under a label, during the call |
+|-------|----------------|------:|------:|------:|------:|------:|
+| AMI ES2004c/d, IS1009c/d, TS3003c/d | saved from earlier meetings in the series | 2.02 | 98.3% | 98.1% | 98.4% | 87.8% |
+| AMI EN2002a, NOTSOFAR-1 MTG_32003/05/08 | none | 0.70 | 94.7% | 92.8% | 95.0% | 73.1% |
+| **All 10** | | **2.72** | **97.3%** | **96.6%** | **97.4%** | **83.6%** |
+
+How it is measured:
+
+- Each recording is replayed through the live pipeline at twice real speed, played in as the call's remote audio, as if every participant were on the other end of a video call. AMI files run their first 20 minutes; the three NOTSOFAR-1 meetings are about 7 minutes each.
+- **Voice profiles.** Six AMI files ran with saved profiles of their participants, enrolled from earlier meetings in the same series (never from the meeting being scored), the way a returning team would use the app. The other four had none. The table reports the two groups separately; with no profiles, attribution is about 3.6 points lower.
+- **During the call.** The screen is scored at every 30 seconds of meeting time, each time against only the speech heard so far. Errors and speech are summed over those snapshots, so a snapshot counts in proportion to the speech it covers. Each file counts in proportion to its own speech in every column.
+- **What SAA leaves out.** As in the finished-transcript SAA, speech without a speaker label is not counted as wrong. During the call that is 16.4% of reference speech: 4.8% sits on lines still showing the neutral "Remote" label, and the rest is speech not on screen yet or not transcribed. The "of labeled speech" column divides by labeled speech only. Counting the "Remote" lines as wrong, attribution reads 92.5% during the call and 95.9% at the last screen. Lines can stay "Remote" for some time before they are identified; by the last screen 1.5% of speech is still unlabeled.
+- **Label changes are not penalized.** The best match between on-screen labels and real speakers is worked out at each snapshot, so a line that moves from one label to another between snapshots is scored on where it sits at that moment. This measures how well speech is grouped by speaker at each point in the call, not how stable the labels are.
+- **The last column is the live screen.** "Last screen before stop" is the live transcript at the end of the replayed excerpt, not the finished transcript scored above, and the AMI excerpts are the first 20 minutes, not whole meetings.
+
+What this does not cover:
+
+- Ten files is a small basis next to the 57 above, and it is one run. Two earlier runs of the same files, on the two builds before this one, read 97.1% and 95.3% during the call.
+- NOTSOFAR-1's far-field rooms are the weak spot: 90–94% per file during the call, against 96.7–99.6% on AMI.
+- The local microphone channel is not scored here. These recordings have one channel, so everything plays as remote audio.
+- Whether the name shown on a line is the right person is a separate measurement and not part of these numbers.
+
+| File | Corpus | Voice profiles | SAA during the call | Of labeled speech | SAA, last screen |
+|------|--------|---|---------:|---------:|---------:|
+| ES2004c | AMI | yes | 98.9% | 98.7% | 99.2% |
+| ES2004d | AMI | yes | 97.8% | 97.3% | 98.4% |
+| IS1009c | AMI | yes | 98.9% | 98.7% | 98.7% |
+| IS1009d | AMI | yes | 97.8% | 97.5% | 97.7% |
+| TS3003c | AMI | yes | 99.6% | 99.6% | 99.3% |
+| TS3003d | AMI | yes | 97.0% | 96.6% | 96.7% |
+| EN2002a | AMI | no | 96.7% | 95.5% | 96.1% |
+| MTG_32003 | NOTSOFAR-1 | no | 93.5% | 90.0% | 94.9% |
+| MTG_32005 | NOTSOFAR-1 | no | 90.2% | 88.1% | 91.1% |
+| MTG_32008 | NOTSOFAR-1 | no | 94.0% | 91.0% | 95.6% |
+
 ## Turn-level accuracy
 
 SAA weights speech by time, so long turns dominate it. The questions a reader actually has are sharper: **is a substantial contribution ever credited to the wrong person**, and what happens on quick exchanges? Turn-level scoring on the same run answers both (definitions under Methodology).
