@@ -14,6 +14,8 @@ Run date: 2026-07-14 (discovery, forward-looking, execution, action-items subset
 | Execution composite (28 scenarios × 3 runs, 2026-07-14) | **91%** (was 97% on Gemini 3 Flash) |
 | Action-items composite (35 scenarios × 3 runs, 2026-07-14) | **90%** (suite expanded from 13 scenarios) |
 | Live action items kept in the saved list (138 AMI meetings, 2026-09-28) | **93%** (was 55%) |
+| Saved action items that are real follow-ups (71 AMI meetings, 2026-10-12) | **92%** (1.2% not in the transcript at all) |
+| Points from the human notes that appear in the saved notes (71 AMI meetings, 2026-10-12) | **91%** (65% in full) |
 | Forward-looking composite (3 scenarios × 3 runs, 2026-07-14) | 87% |
 | Hallucination tag composite (2026-04-12, 5 runs) | 97% |
 | Long-meetings tag composite (2026-04-12, 5 runs) | 96% |
@@ -285,6 +287,65 @@ Action items appear on screen during the call. When the meeting ends, a second p
 The saved list now starts from what you saw live. An item still drops when the rest of the meeting shows it was cancelled or already done.
 
 **The trade:** the saved list is longer. On in-room meetings it now carries more items that were only raised in passing.
+
+## Saved Notes on Real Meetings (AMI)
+
+_Measured 2026-10-12. Notes by Gemini 3.1 Flash Lite, judged by Claude Haiku 5.5._
+
+The sections above test prompts on scenarios written for the purpose. This one runs real recorded meetings through the whole notes pipeline and compares what is saved at the end with notes written by people.
+
+**Corpus:** 71 meetings from the [AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/) (every other one of the 142 with human summaries, 33 hours). For each meeting, AMI's annotators wrote a summary, a list of decisions, a list of problems and open questions, and a list of action items. AMI also marks which topic every stretch of talk belongs to.
+
+**What runs:** each meeting is replayed through the live notes feed as it runs during a call with the notes panel open, refreshing about every half minute. At stop, the post-meeting call writes the saved summary and action items, starting from the live summary points and the live action items, as the app does. The input is AMI's human transcript, so transcription and speaker errors are not part of these numbers.
+
+**Judge:** one Claude Haiku 5.5 call sees a meeting's transcript, the human notes, and every setting's saved notes under shuffled letters, so it cannot tell which setting wrote which. It judges meaning, not wording.
+
+### Action items
+
+| | |
+|---|---:|
+| Saved action items that are real follow-up work in the transcript | **92.2%** (224 / 243) |
+| Saved action items not in the transcript at all | **1.2%** (3 / 243) |
+| Items in the transcript but not follow-up work (done during the meeting, a decision, a rejected idea) | 6.6% |
+| Human-listed action items the saved list carries | 75.3% (131 / 174) |
+
+### Summary coverage
+
+Each sentence of the human notes is a point. Sentences that only say an activity happened ("the project manager opened the meeting") are not scored, and a sentence that only repeats an earlier one is counted once, leaving 744 points. The judge marks each point captured in full, captured in part (something it treats as central is missing), or missed, anywhere in the saved summary or action items.
+
+| Points from the human notes | In full | At least in part |
+|---|---:|---:|
+| **All points** | **64.5%** (95% CI 60.4–68.9) | **91.1%** (88.7–93.5) |
+| Topic discussed for under 2 minutes | 69.4% | 92.5% |
+| Topic discussed for 2 minutes or more | 63.3% | 91.8% |
+| Summary sentences | 61.3% | 95.5% |
+| Decisions | 76.7% | 89.6% |
+| Problems and open questions | 50.7% | 82.6% |
+
+A long summary call tends to give most of its space to whatever was discussed longest, and a topic raised once can drop out. On these meetings, points from topics that got under two minutes are captured at least as often as the rest. Topic time comes from AMI's topic annotation; a point's topic is the one most of its supporting talk falls in. Confidence intervals resample meetings.
+
+**Known weakness — tentative ideas written as settled.** 5.8% of summary bullets (47 of 813) say something the transcript does not support. In a reading of a sample, most are real errors rather than judge strictness: an idea still under discussion written up as "confirmed", a selling price given as the production-cost limit, a task credited to the wrong person. This is the next thing to fix in the post-meeting prompt.
+
+### Panel open or closed
+
+With the notes panel closed, the live feed still runs in the background, every three minutes instead of about every half minute, so the saved notes still start from live points.
+
+| | Panel open | Panel closed |
+|---|---:|---:|
+| Points captured in full | 64.5% | 62.4% |
+| Points captured at least in part | 91.1% | 88.3% |
+| Human-listed action items carried | 75.3% | 66.1% |
+| Saved action items that are real follow-ups | 92.2% | 94.7% |
+| Summary bullets not supported | 5.8% | 6.9% |
+
+The differences are inside the confidence intervals: on these meetings, whether the panel was open does not measurably change the saved notes.
+
+### Limits
+
+- One run on 71 meetings. 69 of them are role-played product-design meetings; all are in English with four participants.
+- Human transcripts: real recordings add transcription and speaker errors on top of these numbers.
+- One judge model. Its calls were spot-checked by reading, not scored against human judgments.
+- Owners are not scored: the transcript labels speakers Speaker_N and the human notes use roles.
 
 ## Timezone Resolution
 
