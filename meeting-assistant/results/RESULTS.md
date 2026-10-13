@@ -14,7 +14,7 @@ Run date: 2026-07-14 (discovery, forward-looking, execution, action-items subset
 | Execution composite (28 scenarios × 3 runs, 2026-07-14) | **91%** (was 97% on Gemini 3 Flash) |
 | Action-items composite (35 scenarios × 3 runs, 2026-07-14) | **90%** (suite expanded from 13 scenarios) |
 | Live action items kept in the saved list (138 AMI meetings, 2026-09-28) | **93%** (was 55%) |
-| Saved action items that are real follow-ups (71 AMI meetings, 2026-10-12) | **92%** (1.2% not in the transcript at all) |
+| Saved action items that are real follow-ups (71 AMI meetings, 2026-10-12) | **92%** (1.2% hallucinated or distorted) |
 | Points from the human notes that appear in the saved notes (71 AMI meetings, 2026-10-12) | **91%** (65% in full) |
 | Forward-looking composite (3 scenarios × 3 runs, 2026-07-14) | 87% |
 | Hallucination tag composite (2026-04-12, 5 runs) | 97% |
@@ -305,7 +305,7 @@ The sections above test prompts on scenarios written for the purpose. This one r
 | | |
 |---|---:|
 | Saved action items that are real follow-up work in the transcript | **92.2%** (224 / 243) |
-| Saved action items not in the transcript at all | **1.2%** (3 / 243) |
+| Saved action items hallucinated or distorted (not in the transcript, or changing what was said) | **1.2%** (3 / 243) |
 | Items in the transcript but not follow-up work (done during the meeting, a decision, a rejected idea) | 6.6% |
 | Human-listed action items the saved list carries | 75.3% (131 / 174) |
 
