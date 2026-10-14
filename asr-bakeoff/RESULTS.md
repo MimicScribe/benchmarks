@@ -452,6 +452,58 @@ in every one of the ten (6.56% against 7.66% mean).
 the same substitution and insertion counts as v3, and a small loss on number
 fidelity and on sentence ends at speaker changes, both measured above.
 
+## MimicScribe's spoken-form fine-tune — the next release
+
+Added 2026-10-14. The next MimicScribe release replaces stock Parakeet Ultra with
+[a fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml)
+(revision `5edfc817`, CC BY 4.0) that writes English numbers the way they were
+said: "twenty nineteen" stays "twenty nineteen", "two thousand nineteen" stays
+"two thousand nineteen". Only the decoder and joint network were trained; the
+encoder and tokenizer are Ultra's.
+
+Three arms on the 27 files (18.8 hours), so the model's effect is separated from
+the app's: the published Ultra arm above (the current release), stock Ultra
+decoded by the next release's app build, and the fine-tune decoded by that same
+build. All three are scored by the same scorer build, which reproduces the
+published Ultra row exactly.
+
+Content basis, numbers excluded (as in the table above):
+
+| arm | error rate | sub | del | ins | AMI | Earnings-21 |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, current release | 13.63% | 7,423 | 10,262 | 4,901 | 20.68% | 7.65% |
+| Parakeet Ultra, next release's app | 13.61% | 7,424 | 10,232 | 4,906 | 20.66% | 7.64% |
+| **Spoken-form fine-tune, next release's app** | **13.59%** | 7,520 | **10,067** | 4,933 | **20.57%** | 7.68% |
+
+Word accuracy is level. The fine-tune drops 165 fewer reference words than
+Ultra in the same build and adds 27 more, and it drops 29% fewer than
+stock Parakeet v3 through FluidAudio's batch runner (14,260), against 28% for
+Ultra.
+
+**Numbers, scored on the transcript as saved.** The fine-tune writes numbers as
+words, and the product saves them that way. Scoring the saved rows directly
+avoids the step that re-joins spoken neighbours into one figure (see the Ultra
+section above), so this table uses a later scorer and does not mix with the
+earlier number tables.
+
+| arm | scored | intact | wrong quantity | dropped | never said | doubled or spliced form |
+|---|---:|---:|---:|---:|---:|---:|
+| Parakeet Ultra, current release | 2,880 | 2,790 (96.9%) | 38 | 52 | 81 | 0 |
+| Parakeet Ultra, next release's app | 2,880 | 2,797 (97.1%) | 35 | 48 | 74 | 0 |
+| **Spoken-form fine-tune, next release's app** | 2,882 | **2,812 (97.6%)** | **29** | **41** | **72** | 0 |
+
+**The one meeting every model decoded** (IS1009a): real words skipped on clean
+speech with fillers stripped, 1.7% (22 of 1,276) for Ultra in both builds and
+**1.5% (19 of 1,276)** for the fine-tune.
+
+**Punctuation**, Earnings-21 rows: sentence-end recall 0.807 → 0.812 and
+sentence-start recall 0.825 → 0.827, while boundary recall at a speaker's last
+word moved 0.950 → 0.949 and capitalisation precision is level (0.886 → 0.885).
+
+**What it costs.** It sometimes writes "GAAP" as "gap". It keeps the other 24
+languages as they were: on FLEURS read speech it is level with Ultra across all
+25 languages ([multilingual results](../multilingual/RESULTS.md)).
+
 ## Nemotron Speech Streaming 0.6B
 
 Added 2026-09-28, revised the same day. NVIDIA's `nemotron-speech-streaming-en-0.6b`
