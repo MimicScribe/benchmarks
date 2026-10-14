@@ -4,7 +4,7 @@ Pipeline: MimicScribe's spoken-form fine-tune of Parakeet Ultra (a post-training
 
 Run date: 2026-10-14. Corpus: 16 AMI meetings, 8.5 hours, headset mixdown (every speaker's close-talk microphone summed to one channel). Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display, latency and the live view against the script come from recorded capture sessions measured on the previous release's build, marked as such.
 
-**What changed this time is the speech model.** The next release replaces stock Parakeet Ultra with [MimicScribe's fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml), which writes numbers the way they were said ("twenty nineteen" stays "twenty nineteen"). Only the decoder and joint network were trained. Every "Parakeet Ultra" column below is the stock model run through the same build, so the difference is the model and nothing else. The fine-tune drops fewer words, keeps more numbers intact, and finds more sentence ends; it misses two more sentence ends at speaker handoffs and its recovery layer adds slightly more wrong words. All of it is published.
+**What changed this time is the speech model.** This release replaces stock Parakeet Ultra with [MimicScribe's fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml), which writes numbers the way they were said ("twenty nineteen" stays "twenty nineteen"). Only the decoder and joint network were trained. Every "Parakeet Ultra" column below is the stock model run through the same build, so the difference is the model and nothing else. The fine-tune drops fewer words, keeps more numbers intact, and finds more sentence ends; it misses two more sentence ends at speaker handoffs and its recovery layer adds slightly more wrong words. All of it is published.
 
 ## Headline numbers
 
@@ -36,7 +36,7 @@ Measured against the human reference over the whole transcript, full vocabulary,
 
 The fine-tune deletes 484 fewer reference words across 8.5 hours of meetings for 97 more insertions and 134 more substitutions. The residue of insertions worth acting on is level (1,358 → 1,347).
 
-**On the earnings calls it moves the same way:** deletions 2,363 → 2,020, insertions 1,755 → 1,859, error rate 9.06% → 8.81%. Scored with filled pauses and casual forms folded on both sides and numbers left out, all 27 files read 13.61% for Ultra and 13.59% for the fine-tune ([the ASR bake-off](../../asr-bakeoff/RESULTS.md#mimicscribes-spoken-form-fine-tune--the-next-release) has that table against every model tested).
+**On the earnings calls it moves the same way:** deletions 2,363 → 2,020, insertions 1,755 → 1,859, error rate 9.06% → 8.81%. Scored with filled pauses and casual forms folded on both sides and numbers left out, all 27 files read 13.61% for Ultra and 13.59% for the fine-tune ([the ASR bake-off](../../asr-bakeoff/RESULTS.md#mimicscribes-spoken-form-fine-tune--the-model-the-product-ships-now) has that table against every model tested).
 
 **We do not publish an absolute word error rate from this instrument.** The AMI reference is the time-ordered union of every speaker's channel, so where two people talk at once it interleaves words no single-stream decoder can emit in order, and each scores as an error however good the recognizer is. That bias is large and constant across builds, which is why the change is meaningful while the level is not.
 

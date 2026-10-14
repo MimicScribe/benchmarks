@@ -1,6 +1,6 @@
 # Multilingual transcription
 
-Word error rate for all 25 languages MimicScribe transcribes, on FLEURS read speech, measured through the app. Compares the speech model in the current release with the next one.
+Word error rate for all 25 languages MimicScribe transcribes, on FLEURS read speech, measured through the app. Compares MimicScribe's spoken-form fine-tune with stock Parakeet Ultra, the model it replaced.
 
 - Results: [RESULTS.md](RESULTS.md)
 - Transcripts: [`results/`](results/)

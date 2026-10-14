@@ -353,7 +353,7 @@ and almost none it should not.
 ships, in both of its own modes on the files tried, and its punctuation is too
 sparse to split speakers on.
 
-## Parakeet Ultra — the model the product ships now
+## Parakeet Ultra — the model the product shipped through 1.0.0-rc.40
 
 Added 2026-09-27. [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra)
 is moondream's post-training of Parakeet TDT 0.6B v3 (CC BY 4.0): the same
@@ -452,9 +452,9 @@ in every one of the ten (6.56% against 7.66% mean).
 the same substitution and insertion counts as v3, and a small loss on number
 fidelity and on sentence ends at speaker changes, both measured above.
 
-## MimicScribe's spoken-form fine-tune — the next release
+## MimicScribe's spoken-form fine-tune — the model the product ships now
 
-Added 2026-10-14. The next MimicScribe release replaces stock Parakeet Ultra with
+Added 2026-10-14. MimicScribe now replaces stock Parakeet Ultra with
 [a fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml)
 (revision `5edfc817`, CC BY 4.0) that writes English numbers the way they were
 said: "twenty nineteen" stays "twenty nineteen", "two thousand nineteen" stays
@@ -462,8 +462,8 @@ said: "twenty nineteen" stays "twenty nineteen", "two thousand nineteen" stays
 encoder and tokenizer are Ultra's.
 
 Three arms on the 27 files (18.8 hours), so the model's effect is separated from
-the app's: the published Ultra arm above (the current release), stock Ultra
-decoded by the next release's app build, and the fine-tune decoded by that same
+the app's: the published Ultra arm above (the previous release), stock Ultra
+decoded by the new release's app build, and the fine-tune decoded by that same
 build. All three are scored by the same scorer build, which reproduces the
 published Ultra row exactly.
 
@@ -471,9 +471,9 @@ Content basis, numbers excluded (as in the table above):
 
 | arm | error rate | sub | del | ins | AMI | Earnings-21 |
 |---|---:|---:|---:|---:|---:|---:|
-| Parakeet Ultra, current release | 13.63% | 7,423 | 10,262 | 4,901 | 20.68% | 7.65% |
-| Parakeet Ultra, next release's app | 13.61% | 7,424 | 10,232 | 4,906 | 20.66% | 7.64% |
-| **Spoken-form fine-tune, next release's app** | **13.59%** | 7,520 | **10,067** | 4,933 | **20.57%** | 7.68% |
+| Parakeet Ultra, previous release | 13.63% | 7,423 | 10,262 | 4,901 | 20.68% | 7.65% |
+| Parakeet Ultra, new release's app | 13.61% | 7,424 | 10,232 | 4,906 | 20.66% | 7.64% |
+| **Spoken-form fine-tune, new release's app** | **13.59%** | 7,520 | **10,067** | 4,933 | **20.57%** | 7.68% |
 
 Word accuracy is level. The fine-tune drops 165 fewer reference words than
 Ultra in the same build and adds 27 more, and it drops 29% fewer than
@@ -488,9 +488,9 @@ earlier number tables.
 
 | arm | scored | intact | wrong quantity | dropped | never said | doubled or spliced form |
 |---|---:|---:|---:|---:|---:|---:|
-| Parakeet Ultra, current release | 2,880 | 2,790 (96.9%) | 38 | 52 | 81 | 0 |
-| Parakeet Ultra, next release's app | 2,880 | 2,797 (97.1%) | 35 | 48 | 74 | 0 |
-| **Spoken-form fine-tune, next release's app** | 2,882 | **2,812 (97.6%)** | **29** | **41** | **72** | 0 |
+| Parakeet Ultra, previous release | 2,880 | 2,790 (96.9%) | 38 | 52 | 81 | 0 |
+| Parakeet Ultra, new release's app | 2,880 | 2,797 (97.1%) | 35 | 48 | 74 | 0 |
+| **Spoken-form fine-tune, new release's app** | 2,882 | **2,812 (97.6%)** | **29** | **41** | **72** | 0 |
 
 **The one meeting every model decoded** (IS1009a): real words skipped on clean
 speech with fillers stripped, 1.7% (22 of 1,276) for Ultra in both builds and
