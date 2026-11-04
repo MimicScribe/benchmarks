@@ -4,7 +4,7 @@ How reliably does the app recognize a *returning* speaker — someone with a sav
 voice profile — in a new meeting? This is a different question from diarization
 (who spoke when, within one meeting), and it is scored separately.
 
-Run date: 2026-08-01 (voiceprint-evidence and cluster-consistency rows added 2026-08-20; merge-across-recordings row added 2026-08-27; device-switch row re-measured 2026-08-28)
+Run date: 2026-11-04 for the headline, second-corpus, real-timeline and device-switch rows. They were measured on the development build that becomes the next release. Other rows keep the dates listed under Reproducibility.
 
 ## What is measured
 
@@ -30,37 +30,48 @@ rather than guesses.
 ## Headline numbers
 
 AMI meeting corpus (CC BY 4.0), recurring speakers across sessions, profiles
-built by the exact production code path (never a more permissive shortcut), 30
-seconds of enrollment speech, full-meeting recognition:
+built by the exact production code path (never a more permissive shortcut),
+full-meeting recognition:
 
 | Metric | Value |
 |---|---|
-| Correct identification | **92.0%** (779 genuine trials) |
-| Wrong identification | **0** (95% upper bound 0.5%) |
+| Correct identification, 30 seconds of clear speech per recording | **96.3%** (750 of 779 trials) |
+| Correct identification, each recording's full history | **98.5%** (767 of 779 trials) |
+| Wrong identification | **0** of 779 (95% upper bound 0.5%) |
 | Below-bar suggestion tier precision | 90% (95% CI 79–96%) |
-| Speech required to create a profile | **20 seconds** across a few turns (a hard floor: below it, the app refuses to enroll) |
-| First suggestion for an already-enrolled speaker | within the first **~5 seconds** of heard speech (reaches 36.5% of returning speakers at 91.9% precision) |
+| Speech required to create a profile | **30 seconds** of clear speech in any number of turns, with one stretch of at least 7.5 seconds, from the next release; the current release asks for 20 seconds across a few turns (a hard floor: below it, the app refuses to enroll) |
+| First suggestion for an already-enrolled speaker | within the first **~5 seconds** of heard speech (reaches 36.6% of returning speakers at 91.0% precision) |
+
+This page used to report 92.0% for the 30-second row. Most of the change is in
+how the test counts speech, not in the app. The test used to count 30 seconds
+before removing unreliable speech, which left about 15 to 30 seconds of usable
+speech. It now counts 30 seconds of reliable speech, the way the app does.
+Undoing that correction alone gives 92.6%. Matching the app's two voiceprints per
+established profile adds about 0.3 points. Undoing both gives 92.7%, so the last
+0.7 points back to 92.0% come from other changes since August that we did not
+trace.
 
 The last two rows are the timing context the accuracy rows need: they say how
-long it takes to get *into* the system. Creating a profile requires 20 seconds
-of qualifying speech spread across a few separate turns (a single continuous
-monologue needs more); below that the app refuses to enroll rather than build
-a profile from too little evidence. The floor was originally 30 seconds and
-was lowered only after a dedicated recalibration: 2,808 profiles that the old
-floor refused were admitted on this corpus with zero wrong identifications and
-zero impostor false-accepts, and the floors that did not pass that bar were
-left unchanged. Every budget that clears the floor measured zero wrong
-identifications. Recognizing a returning speaker starts
+long it takes to get *into* the system. From the next release, creating a profile
+requires 30 seconds of qualifying speech, in one turn or several, with at least one stretch of 7.5
+seconds; below that the app refuses to enroll rather than build a profile from
+too little evidence. Earlier versions counted turns as well as seconds, which
+refused one clean long turn while admitting several short ones.
+The 96.3% is measured with 30 seconds per recording, pooled across a speaker's
+other meetings, so it is not the score of a profile saved from one meeting; the
+real-timeline section below is. At full-meeting length this test measured zero
+wrong identifications; shorter speech and the same-room tests below found some.
+Recognizing a returning speaker starts
 much sooner than that: within the first ~5 seconds they are heard in a new
 meeting, the one-click suggestion tier already reaches about a third of
-returning speakers at ~92% precision, while automatic naming deliberately
+returning speakers at ~91% precision, while automatic naming deliberately
 waits for more evidence before committing a name on its own.
 
-The refusals that make up the remaining ~8% are dominated by short speech:
+The refusals that make up the remaining ~4% are dominated by short speech:
 recognition-time speech, not enrollment speech, is the binding constraint.
 Coverage roughly doubles between the first ~20 seconds a speaker is heard and
 the full meeting. Forced early snapshots are also where the rare wrong
-identification lives — under 0.6% when a decision is forced at 10–20 seconds
+identification lives — under 1% when a decision is forced at 10–20 seconds
 of heard speech — which is why the app accumulates evidence rather than
 committing on first hearing; at full-meeting evidence, wrong identifications
 measured zero. Below the automatic-match bar, the app shows a one-click "Is
@@ -74,14 +85,35 @@ not tuned to one corpus's acoustics, the same production decision rules run
 on an independent second corpus (ICSI meeting corpus), with the same
 reference-label audit applied first — it excluded eleven ICSI sessions with
 suspect labels, the same defect class the audit caught and excluded in AMI.
-Under a one-probe-per-returning-speaker protocol, AMI measures 99.4% correct
-(170 trials) and ICSI measures 89.5% (38 trials, a thin sample with wide
-bounds) — zero wrong identifications on both, with the entire gap being
-additional refusals, never wrong names. ICSI also enables a larger same-room
-impostor test than AMI supports (410 trials of people probing their actual
-room-mates' profiles): one wrong match appeared (0.2%). That is the number
-at higher statistical power, and ICSI now runs as a standing validation
-corpus alongside AMI.
+On the same test ICSI measures 90.9% with 30 seconds per recording (359 of 395
+trials) and 92.4% with full history (365 of 395), with zero wrong
+identifications. The gap to AMI is all refusals. ICSI also enables a larger
+same-room test (410 trials of people probing their room-mates' profiles, with
+their own profile in the library): one wrong match appeared (0.2%). ICSI runs as
+a standing validation corpus alongside AMI.
+
+## The real timeline
+
+The tests above pool several recordings per profile and use speech cut by human
+reference labels. This test follows normal use. A profile is saved from the
+first meeting where a person clears the floor, later meetings are scored in
+order, and each correct match teaches the profile. About one person in five
+never saves a profile and serves as a stranger. Each row covers 30 meeting orders
+and scores a person's main voice in each meeting, by voice alone.
+
+| Corpus and pipeline | Named correctly | Wrong name | Strangers given a name |
+|---|---|---|---|
+| AMI, 46 meetings, current pipeline | **98.0%** (2,630 trials) | 0 | 0 of 2,415 |
+| AMI, 168 meetings, earlier pipeline | 97.0% (11,072 trials) | 31 (0.3%) | 47 of 8,401 (0.6%) |
+| ICSI, 64 meetings, earlier pipeline | 94.2% (8,166 trials) | 0 | 0 of 3,608 |
+
+These counts repeat the same people across meeting orders, so they are not
+independent trials. The first row covers 44 returning people and 172 separate
+stranger appearances, so its zero is compatible with a true stranger rate of up
+to about 2%. In that row every main voice with 30 seconds or more of speech was
+named correctly; the misses are shorter. Its 46 meetings leave out most of the
+voice pairs behind the errors in the second row, so they do not show that those
+pairs are solved.
 
 ## Switching devices
 
@@ -89,10 +121,10 @@ A profile enrolled on one microphone and heard on a very different one is the
 hardest realistic case for a returning speaker. Measured with AMI's two capture
 chains standing in for a device switch (headset for enrollment, distant room
 array for recognition): with full-meeting evidence the switch costs little —
-95% recognized versus 97% on the matched device — but with only 20 seconds of
-heard speech, recognition drops to 26% versus 65%, all of it refusals rather
+94% recognized versus 97% on the matched device — but with only 20 seconds of
+heard speech, recognition drops to 25% versus 64%, all of it refusals rather
 than wrong names. Once a single meeting on the new device is confirmed into
-the profile, 20-second recognition recovers to 42%
+the profile, 20-second recognition recovers to 40%
 and keeps climbing with more evidence, at no change to the false-accept rate.
 The app's enrollment flow adds that meeting automatically once the speaker is
 confirmed.
@@ -144,10 +176,9 @@ work together:
 - **Close calls are refused, and visibly.** When two profiles score within an
   ambiguity margin of each other, the app refuses the match and surfaces the
   conflict instead of silently picking one.
-- **The alternatives were measured, not assumed.** Every mechanism above
-  shipped only after beating its alternatives on this benchmark; intuitive
-  alternatives that measured no better — or actively worse — than the simpler
-  approach are not in the app.
+- **The alternatives were measured, not assumed.** Intuitive alternatives that
+  measured no better — or actively worse — than the simpler approach are not in
+  the app.
 
 ## Merging two recordings of the same voice
 
@@ -170,6 +201,38 @@ all trace to reference clusters whose first 40 seconds contain a second
 speaker's voice; at full-meeting evidence the same pairs score far apart.
 Below 20 seconds the app does not unify on voice at all.
 
+## A second voiceprint, used only like-for-like
+
+Each speaker turn now also carries a second voiceprint, computed in one pass
+from that speaker's own audio after the meeting ends. It is stored next to the
+existing voiceprint, not in place of it, and every number above still comes
+from the existing one.
+
+The two are never compared with each other. When saved profiles built from the
+existing voiceprint were scored against the new one, recognition of the
+author's own microphone fell from 91 to 76 of 120 trials. So the second
+voiceprint is used only when both the saved profile and the new meeting have
+it, and only for a speaker the existing matcher left unnamed. It never changes
+a name the existing matcher assigned or a match it refused, and it does not
+override a name the meeting's context gave.
+
+The effect is small and starts late. A profile needs second-voiceprint audio
+from more than one meeting after the update before this applies. Measured
+with the exact decision rule:
+
+| Substrate | Correct identification | Added wrong identifications | Unenrolled speakers named |
+|---|---|---|---|
+| AMI, 3-meeting profiles (552 trials) | 97.3% → 97.5% | 0 | 0 |
+| AMI, 2-meeting profiles (600 trials) | 96.0% → 96.2% | 0 | 0 |
+| ICSI, 3-meeting profiles (347 trials) | 95.1% → 95.1% | 0 | 0 |
+| ICSI, 2-meeting profiles (362 trials) | 92.3% → 92.3% | 0 | 0 |
+| Author's own microphone (10 trials) | 8 → 9 of 10 | 0 | 0 |
+
+These trials use whole-meeting recognition and profiles from two or three
+earlier meetings, so their baseline is higher than the 30-second-enrollment
+headline above. The zeros are measured zeros with small denominators, not
+guarantees.
+
 ## Honest caveats
 
 - AMI headset and room-microphone conditions are acoustically closer to each
@@ -191,6 +254,9 @@ Below 20 seconds the app does not unify on voice at all.
 - The device-switch numbers use AMI's headset-vs-array chains as a stand-in
   for a real device switch; the shape of the result is the claim, the exact
   percentages are corpus-specific.
+- No test here passes audio through a call. Conferencing codecs and network
+  loss are not measured.
+- All corpora are English. One person speaking two languages is not measured.
 
 ## Methodology
 
@@ -201,27 +267,31 @@ recurring speaker's newest session for recognition and enroll from the rest,
 so no recognition audio ever contributes to the profile it is scored against.
 False-accept trials probe every profile with speakers who co-occurred in the
 same rooms — the hardest impostor population — plus cross-corpus strangers.
+Stranger tests remove the stranger's own profile from the library, as in real
+use. A test feeds real voice vectors through both the app's own matching and
+profile-building code and these scoring scripts and requires the same decisions;
+deliberately wrong copies of the rules must fail it.
 
-The results above are measured on reference-segmented speech. Re-scoring
-the same decision rules on the app's own diarizer output over real
-recordings gave the same outcome: the main voice cluster for each speaker
-was recognized as the benchmark predicts, and every failure was a refusal,
-not a wrong name. The benchmark also runs as a regression gate: a change to
-profile logic must reproduce these results exactly before it ships.
+The results above are measured on reference-segmented speech, except the
+real-timeline section, which runs the same decision rules on the app's own
+diarizer output. The benchmark also runs as a regression gate for changes to
+profile logic.
 
 ## Reproducibility
 
-Produced at `parakeet-transcriber` commit `9df400c9` with production default
-parameters on the cached AMI embedding substrate. The enrollment-floor and
-suggestion-timing rows were produced at commit `8efacf56` on the same
+The headline, second-corpus, real-timeline, device-switch and same-room stranger
+rows were produced at `parakeet-transcriber` commit `acbf5a45` with
+`scripts/profile_identity_benchmark.py --production-gallery` (`--corpora ami`, then
+`--corpora icsi`), `scripts/exp_identity_tuning/many_orders.sh`,
+`scripts/identity_decision_cells.py deviceswitch`,
+`scripts/centroid_pricing_cells.py production` and
+`scripts/time_to_eligibility_cell.py`, at default parameters. The
+enrollment-floor row was produced at commit `8efacf56` on the same
 substrate, also with production default parameters; the enrollment-floor
-recalibration (30 → 20 seconds) was produced at commit `afc0a31f`, and the
-second-corpus (ICSI) validation at commit `126c0a05`. The device-switch and
+recalibration (30 → 20 seconds, the current release's rule) was produced at commit `afc0a31f`, and the
+one-wrong-in-410 same-room row at commit `126c0a05`. The first device-switch and
 shared-profile measurements were produced at commits `6a62b013`, `5fed6281`,
-and `468c3f59`, with the device-switch row re-measured at `40ddb180`
-(2026-08-28) after a consistency check on first enrollments landed — one of
-the 63 device-switch trials is now refused at enrollment, so that row is
-reported over 62 trials, and the shared-profile follow-ups and diarizer-output check
+and `468c3f59`, and the shared-profile follow-ups and diarizer-output check
 at commits `323421b3` and `d1067e57` — production default parameters
 throughout. The voiceprint-evidence rows were produced at commit `dc0bd03d`
 (against `c57c3bec` for the before arm) with
@@ -231,4 +301,8 @@ cluster-consistency calibration with `scripts/coherence_floor_rttm.py` at
 default parameters on the cached AMI embedding substrate. The
 merge-across-recordings row was produced at commit `866a9299` with
 `scripts/identity_decision_cells.py mergepair` on the same substrate, default
-parameters.
+parameters. The second-voiceprint rows were produced at commit `060788641`
+with `scripts/exp_identity_tuning/recipe_match_sim.py all 3` and `all 2` on the
+AMI and ICSI embedding banks built by `scripts/exp_identity_tuning/bank.py`,
+default parameters, and over the committed golden pairs replayed with that build for the
+microphone rows.
