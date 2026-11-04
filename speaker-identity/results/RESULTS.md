@@ -113,10 +113,12 @@ work together:
   microphone side — rather than blurring them into one average.
 - **Every voiceprint must clear its own evidence-based confidence bar before
   it can claim a match.** A voiceprint that sits acoustically close to
-  someone else's profile has to be *more* confident than one that stands
-  alone. This is what makes multiple voiceprints safe: in our measurements it
-  removed every same-room false accept that a naive best-match rule produced
-  (5 of 1,401 stranger trials → 0), at no cost in correct identifications.
+  someone else's saved profile has to be *more* confident than one that stands
+  alone. In a same-room test on earlier vectors, a plain best-match rule gave 5
+  of 1,401 trials a wrong name at full-meeting length. This rule removed all
+  five when the other person also had a saved profile, and none when they were
+  a stranger with no profile. All five come from two pairs of voices. This page
+  used to report only the first case, and called it stranger trials.
 - **A profile deliberately shared by two people keeps one voiceprint per
   person.** Merging two people into one profile is the user's decision and
   is never second-guessed. Averaging the two voices together would cost the

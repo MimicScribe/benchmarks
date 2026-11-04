@@ -5,6 +5,7 @@ Evaluation suites for the [MimicScribe](https://mimicscribe.app) meeting transcr
 | Benchmark | What it measures | Results |
 |-----------|-----------------|---------|
 | [Diarization](diarization/) | Speaker attribution accuracy on public corpora (AMI, Earnings-21, VoxConverse, SCOTUS) | [Results](diarization/results/RESULTS.md) |
+| [Speaker Identity](speaker-identity/) | How often a returning speaker is matched to their saved profile, and how often someone gets the wrong name | [Results](speaker-identity/results/RESULTS.md) |
 | [Live Transcription](live-transcription/) | Streaming window-stitch integrity — every stitch-point disagreement counted, words never silently dropped, content-word recall vs human transcripts, sentence punctuation | [Results](live-transcription/results/RESULTS.md) |
 | [ASR Model Bake-off](asr-bakeoff/) | Dated September 2026 comparison of Parakeet Ultra, Parakeet v3/v2, Parakeet Unified, Cohere Transcribe and Granite Speech on the same corpus: word error, number fidelity, and two blind rubric judges, with a build-free reproduction | [Results](asr-bakeoff/RESULTS.md) |
 | [Multilingual](multilingual/) | Word error rate in all 25 supported languages on FLEURS read speech, measured through the app; MimicScribe's spoken-form fine-tune vs stock Parakeet Ultra | [Results](multilingual/RESULTS.md) |
