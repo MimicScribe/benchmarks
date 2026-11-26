@@ -1,12 +1,40 @@
-# MimicScribe Live Transcription Benchmark Results
+# MimicScribe Speech Recognition & Live Transcription Benchmark Results
 
-Pipeline: MimicScribe's spoken-form fine-tune of Parakeet Ultra (a post-training of Parakeet TDT 0.6B v3) on CoreML, transcribing in real time from overlapping listening windows.
+Pipeline: MimicScribe's spoken-form fine-tune of Parakeet Ultra (a post-training of Parakeet TDT 0.6B v3) on CoreML, with the four fine-tuned top Conformer encoder layers exported in native FP16, transcribing in real time from overlapping listening windows on Apple Silicon.
 
-Run date: 2026-10-14. Corpus: 16 AMI meetings, 8.5 hours, headset mixdown (every speaker's close-talk microphone summed to one channel). Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display, latency and the live view against the script come from recorded capture sessions measured on the previous release's build, marked as such.
+This page is the unified speech-recognition hub. It separates **speech model quality** (updated **2026-11-25** for the FP16 top-4 spoken-form model, `9e462b9f`) from **live streaming pipeline behavior** (carried from `5346809ee` / `964e6af11` and scheduled for a single clean re-pin on the tagged `1.0.0-rc.49` binary). Multilingual results across all 25 languages live in [multilingual/RESULTS.md](../../multilingual/RESULTS.md); the dated cross-model comparison lives in [asr-bakeoff/RESULTS.md](../../asr-bakeoff/RESULTS.md).
 
-**What changed this time is the speech model.** This release replaces stock Parakeet Ultra with [MimicScribe's fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml), which writes numbers the way they were said ("twenty nineteen" stays "twenty nineteen"). Only the decoder and joint network were trained. Every "Parakeet Ultra" column below is the stock model run through the same build, so the difference is the model and nothing else. The fine-tune drops fewer words, keeps more numbers intact, and finds more sentence ends; it misses two more sentence ends at speaker handoffs and its recovery layer adds slightly more wrong words. All of it is published.
+## Speech model evaluation (2026-11-25 — FP16 top-4, `9e462b9f`)
 
-## Headline numbers
+Every row below compares unmodified stock Parakeet Ultra (`95eaa59a`) against MimicScribe's retrained spoken-form FP16 top-4 model (`9e462b9f`) through the exact same release build on the same Apple Silicon Mac, with no transcription caches.
+
+| Evaluation | Stock Parakeet Ultra | Spoken-form FP16 top-4 | Change |
+|---|---:|---:|---:|
+| **Unseen multi-speaker meetings** (46 held-out AMI meetings, ~282k words, raw WER) | 22.70% | **22.11%** | **−0.59 pp** (−1,653 net errors) |
+| **Unseen earnings calls — numbers right** (10 held-out Earnings-22 calls, 2,425 figures) | 2,169 (89.4%) | **2,225 (91.8%)** | **+56 figures** (−2.31 pp value error) |
+| **Unseen earnings calls — currencies** (171 sites: kept / mangled / front-only / stray) | 141 / 0 / 26 / 0 | **145 / 0 / 0 / 0** | +4 kept, **0** front-only/mangled/stray |
+| **Unseen earnings calls — periods after numbers lost** (332 sentence-end sites) | 70 | **74** | +4 (cut 64% of prior spoken-form excess) |
+| **22 real earnings calls — numbers right** (5,606 figures, Earnings-21 + Earnings-22) | 5,349 (95.4%) | **5,404 (96.4%)** | **+55 figures** (95% CI +32 to +78) |
+| **Paired 27-file content WER** (16 AMI + 11 Earnings-21, 161,660 content words) | — *(AMI-16: 20.78%)* | **13.69%** *(AMI-16: 20.68%, E21-11: 7.68%)* | −0.10 pp on AMI-16 vs. stock |
+| **Multilingual WER across 25 languages** ([FLEURS](../../multilingual/RESULTS.md), 6,039 clips, 4,912 number-neutral) | 10.06% | **10.04%** | **−0.03 pp** (95% CI −0.08 to +0.03) |
+| **Non-English spoken numbers** (24 languages, 1,786 figures) | 1,604 (89.81%) | **1,604 (89.81%)** | **0.00 pp** (0 English leaks in 6,399 clips) |
+| **Processing speed** (46 unseen AMI meetings, 28.5 h audio, M1 Max ANE) | 52.9× realtime | **63.9× realtime** | faster on Neural Engine |
+
+**Why this model replaced the prior INT8 spoken-form build:**
+- **Repeats and live-tail stability:** One-frame rapid repeats across 22 real calls drop 26% vs. the prior spoken-form build and sit at stock levels (0.45 vs. 0.43 per 1,000 words); filler timing stays anchored near stock rather than collapsing to single-frame spikes.
+- **Periods after numbers:** Cuts excess lost sentence-ending periods immediately after numbers by ~63–64% on both synthetic tests and unseen earnings calls.
+- **Fast speech and background noise:** At `1.4×` playback speed on long-form number stress audio, 639 of 661 figures stay intact (vs. 598 on stock); under steady background noise on Apple Neural Engine FP16, timing stays stable (0% collapse vs. 87.6% on the prior build).
+- **Honest caveats:** Held-out AMI and Earnings-22 file identifiers are kept sealed so they cannot become tuning targets (only aggregate totals are published). The unseen Earnings-22 set contains 0 GBP sites, so British pound coverage comes from the 22-call development set and synthetic checks rather than the sealed holdout. Non-English multilingual testing covers single-sentence read speech only, not multi-speaker meetings.
+
+---
+
+## Live streaming pipeline benchmarks (carried pending `1.0.0-rc.49` re-pin)
+
+*Carried from the 2026-10-14 build (`5346809ee`, prior spoken-form build) and 2026-09-27 build (`964e6af11`, stock Parakeet Ultra) as marked below. All pipeline axes below will be re-measured on the tagged `1.0.0-rc.49` release binary in a single pass.*
+
+Run date (pipeline sections below): 2026-10-14. Corpus: 16 AMI meetings, 8.5 hours, headset mixdown (every speaker's close-talk microphone summed to one channel). Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display, latency and the live view against the script come from recorded capture sessions measured on the 2026-09-27 build, marked as such.
+
+## Headline numbers (carried pipeline pin — 2026-10-14)
 
 | Metric | Value |
 |---|---:|
@@ -95,7 +123,7 @@ The fine-tune finds 19 more of the sentence ends a human wrote with 3 more place
 
 The committed tier holds its promise on both models, at about a third of a percent, which is roughly 16x steadier than the provisional tail. Ultra's committed text changes a little more often than v3's on the same build: 609 of 196,069 committed words against 505 of 199,579, and 423 small revisions against 349. Its provisional tail changes less. The last page read 0.33% on the build before this one.
 
-Basis: 4 recorded capture sessions, not the 16-meeting corpus. All four were **re-recorded for this page**, on both models, with the build under test. They are no longer carried forward.
+Basis: 4 recorded capture sessions, not the 16-meeting corpus. Both columns were recorded together on `964e6af11` (2026-09-27) and are carried forward as noted above pending re-recording on `1.0.0-rc.49`.
 
 ## Latency to trust
 
@@ -441,29 +469,33 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 
 ## Provenance
 
-| Axis | Commit | Measured | Basis |
+| Axis | Commit / Binary | Measured | Basis |
 |---|---|---|---|
-| Word accuracy, loss clumping, crosstalk split | `5346809ee` | 2026-10-14 | 16 AMI meetings |
-| Sentence punctuation and casing | `5346809ee` | 2026-10-14 | 11 Earnings-21 calls |
-| Numbers in the saved transcript | `5346809ee` | 2026-10-14 | 11 Earnings-21 calls (2,882 quantities) |
-| Words the recovery layer adds | `5346809ee` | 2026-10-14 | 27 files, 18.83 hours, ledgered run |
-| Hallucinated rows | `5346809ee` | 2026-10-14 | the same ledgered run |
-| Invented phrases over silence | `5346809ee` | 2026-10-14 | 16 AMI meetings, 8.51 hours, its own token-frame arm |
-| Wrong figures by magnitude | `5346809ee` | 2026-10-14 | this page's 29 corruptions, split by ratio |
-| Saved-transcript duplicates | `5346809ee` | 2026-10-14 | 27 files, 18.83 hours |
-| Per-file sign counts | `5346809ee` | 2026-10-14 | this page's own pair of arms, 27 files |
+| Unseen AMI holdout (raw WER & speed) | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 46 unseen AMI meetings (~282k words, aggregate-only) |
+| Unseen Earnings-22 holdout (numbers, currency, stops) | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 10 unseen Earnings-22 calls (2,425 figures, aggregate-only) |
+| 22 real earnings calls & 27-file content WER | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 22 calls (5,606 figures) + 16 AMI / 11 E21 (161,660 words) |
+| Multilingual WER & non-English numbers | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 25 languages on FLEURS (6,039 + 800 clips) |
+| Word accuracy, loss clumping, crosstalk split | `5346809ee` | 2026-10-14, **carried** | 16 AMI meetings |
+| Sentence punctuation and casing | `5346809ee` | 2026-10-14, **carried** | 11 Earnings-21 calls |
+| Numbers in the saved transcript | `5346809ee` | 2026-10-14, **carried** | 11 Earnings-21 calls (2,882 quantities) |
+| Words the recovery layer adds | `5346809ee` | 2026-10-14, **carried** | 27 files, 18.83 hours, ledgered run |
+| Hallucinated rows | `5346809ee` | 2026-10-14, **carried** | the same ledgered run |
+| Invented phrases over silence | `5346809ee` | 2026-10-14, **carried** | 16 AMI meetings, 8.51 hours, its own token-frame arm |
+| Wrong figures by magnitude | `5346809ee` | 2026-10-14, **carried** | 2026-10-14 arm's 29 corruptions, split by ratio |
+| Saved-transcript duplicates | `5346809ee` | 2026-10-14, **carried** | 27 files, 18.83 hours |
+| Per-file sign counts | `5346809ee` | 2026-10-14, **carried** | 2026-10-14 pair of arms, 27 files |
 | Determinism | `964e6af11`, decoded twice | 2026-09-27, **carried** | 27 files (16 AMI + 11 Earnings-21) |
 | Live display stability | `964e6af11` | 2026-09-27, **carried** | 4 capture sessions |
 | Latency to trust | `964e6af11` | 2026-09-27, **carried** | the same 4 capture sessions |
 | Live view against the script | `964e6af11`, debug build | 2026-09-27, **carried** | 7 capture sessions (script rows: 5) |
 
-**One build, two models.** Every 2026-10-14 row above is the same release build, from a clean export of `5346809ee`. Both columns are cold decodes with no transcription cache of any kind: stock Parakeet Ultra (`next_release_2026-10-14/stock_5346809ee`) and the fine-tune (`next_release_2026-10-14/B_5346809ee`). The model is swapped by pointing the build at a different weight bundle, and each run's log was checked to confirm which one it loaded.
+**One build, two models.** Every 2026-11-25 model comparison above runs stock Parakeet Ultra (`95eaa59a`) and the spoken-form FP16 top-4 fine-tune (`9e462b9f`) through the same release binary (`27d658215705`) with fresh per-arm sandboxes and no transcription cache. Likewise, every carried 2026-10-14 pipeline row compared stock Ultra and the earlier `5edfc817` fine-tune on `5346809ee`.
 
-**The scoring basis is stated because it matters.** The product writes every number as words, so the word-accuracy scorers convert numbers to digits on both sides before comparing (`MIMICSCRIBE_ITN_NUMBERS=1`). The number rows score the transcript as saved.
+**The scoring basis is stated because it matters.** The product writes English numbers as spoken words, so corpus word-accuracy scorers align numbers on one basis (`MIMICSCRIBE_ITN_NUMBERS=1` on the carried 2026-10-14 pipeline rows; content-word Levenshtein on the 2026-11-25 27-file check; raw full-vocabulary WER on the 46-meeting unseen AMI holdout). All number rows score the transcript as saved by numeric value.
 
-**Carried rows** replay recorded sessions in real time, and were last measured on the previous release's build with stock Parakeet Ultra. The fine-tune changes only the decoder and joint network weights, not the windowing or the display.
+**Carried rows** measure the live streaming pipeline and replay sessions from earlier builds; they are explicitly dated and marked carried here rather than presented as re-measured on the FP16 top-4 model.
 
-Model: MimicScribe's spoken-form fine-tune of Parakeet Ultra (`MimicScribe/parakeet-ultra-spoken-coreml` at `5edfc817`, decoder and joint network weights on the `FluidInference/parakeet-ultra-coreml` bundle at `95eaa59a`), Apple Silicon. The Parakeet Ultra column is that bundle unmodified.
+Current model: MimicScribe's spoken-form FP16 top-4 fine-tune of Parakeet Ultra (`MimicScribe/parakeet-ultra-spoken-coreml` at `9e462b9f`, top-4 Conformer encoder layers in FP16 plus decoder and joint weights on `FluidInference/parakeet-ultra-coreml` at `95eaa59a`), Apple Silicon. The stock Parakeet Ultra column is `95eaa59a` unmodified.
 
 ## Pins
 
