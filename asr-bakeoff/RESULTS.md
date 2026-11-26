@@ -454,6 +454,8 @@ fidelity and on sentence ends at speaker changes, both measured above.
 
 ## MimicScribe's spoken-form fine-tune — the model the product ships now
 
+> **Update (2026-11-26):** The `5edfc817` fine-tune documented below has since been superseded by the retrained FP16 top-4 spoken-form fine-tune (`9e462b9f`). Current numbers across the same 27-file corpus, held-out meetings, Break-It stress tests, and all 25 languages live in [live-transcription/results/RESULTS.md](../live-transcription/results/RESULTS.md).
+
 Added 2026-10-14. MimicScribe now replaces stock Parakeet Ultra with
 [a fine-tune of it](https://huggingface.co/MimicScribe/parakeet-ultra-spoken-coreml)
 (revision `5edfc817`, CC BY 4.0) that writes English numbers the way they were

@@ -2,95 +2,116 @@
 
 Pipeline: MimicScribe's spoken-form fine-tune of Parakeet Ultra (a post-training of Parakeet TDT 0.6B v3) on CoreML, with the four fine-tuned top Conformer encoder layers exported in native FP16, transcribing in real time from overlapping listening windows on Apple Silicon.
 
-This page is the unified speech-recognition hub. It separates **speech model quality** (updated **2026-11-25** for the FP16 top-4 spoken-form model, `9e462b9f`) from **live streaming pipeline behavior** (carried from `5346809ee` / `964e6af11` and scheduled for a single clean re-pin on the tagged `1.0.0-rc.49` binary). Multilingual results across all 25 languages live in [multilingual/RESULTS.md](../../multilingual/RESULTS.md); the dated cross-model comparison lives in [asr-bakeoff/RESULTS.md](../../asr-bakeoff/RESULTS.md).
+This page is the unified speech-recognition hub. Every section below reflects the shipped FP16 top-4 spoken-form model (`9e462b9f`), with all live streaming pipeline axes, long-form number-seam stress tests, live display captures, quiet-machine footprint measurements, and determinism re-measured on the `270d9cc4b` release build (**2026-11-26**). Multilingual results across all 25 languages live in [multilingual/RESULTS.md](../../multilingual/RESULTS.md); the historical cross-model comparison lives in [asr-bakeoff/RESULTS.md](../../asr-bakeoff/RESULTS.md).
 
-## Speech model evaluation (2026-11-25 — FP16 top-4, `9e462b9f`)
+## Speech model evaluation (FP16 top-4, `9e462b9f`)
 
-Every row below compares unmodified stock Parakeet Ultra (`95eaa59a`) against MimicScribe's retrained spoken-form FP16 top-4 model (`9e462b9f`) through the exact same release build on the same Apple Silicon Mac, with no transcription caches.
+Every row below compares unmodified stock Parakeet Ultra (`95eaa59a`) against MimicScribe's retrained spoken-form FP16 top-4 model (`9e462b9f`) through the same release build on the same Apple Silicon Mac, with no transcription caches.
 
 | Evaluation | Stock Parakeet Ultra | Spoken-form FP16 top-4 | Change |
 |---|---:|---:|---:|
 | **Unseen multi-speaker meetings** (46 held-out AMI meetings, ~282k words, raw WER) | 22.70% | **22.11%** | **−0.59 pp** (−1,653 net errors) |
 | **Unseen earnings calls — numbers right** (10 held-out Earnings-22 calls, 2,425 figures) | 2,169 (89.4%) | **2,225 (91.8%)** | **+56 figures** (−2.31 pp value error) |
 | **Unseen earnings calls — currencies** (171 sites: kept / mangled / front-only / stray) | 141 / 0 / 26 / 0 | **145 / 0 / 0 / 0** | +4 kept, **0** front-only/mangled/stray |
-| **Unseen earnings calls — periods after numbers lost** (332 sentence-end sites) | 70 | **74** | +4 (cut 64% of prior spoken-form excess) |
+| **Unseen earnings calls — periods after numbers lost** (332 sentence-end sites) | 70 | **74** | +4 (close to stock) |
 | **22 real earnings calls — numbers right** (5,606 figures, Earnings-21 + Earnings-22) | 5,349 (95.4%) | **5,404 (96.4%)** | **+55 figures** (95% CI +32 to +78) |
-| **Paired 27-file content WER** (16 AMI + 11 Earnings-21, 161,660 content words) | — *(AMI-16: 20.78%)* | **13.69%** *(AMI-16: 20.68%, E21-11: 7.68%)* | −0.10 pp on AMI-16 vs. stock |
+| **Paired 27-file content WER** (16 AMI + 11 Earnings-21, 161,660 content words) | 13.67% *(AMI-16: 20.71%, E21-11: 7.61%)* | **13.68%** *(AMI-16: 20.63%, E21-11: 7.69%)* | +0.01 pp *(AMI-16 −0.08 pp)* |
 | **Multilingual WER across 25 languages** ([FLEURS](../../multilingual/RESULTS.md), 6,039 clips, 4,912 number-neutral) | 10.06% | **10.04%** | **−0.03 pp** (95% CI −0.08 to +0.03) |
 | **Non-English spoken numbers** (24 languages, 1,786 figures) | 1,604 (89.81%) | **1,604 (89.81%)** | **0.00 pp** (0 English leaks in 6,399 clips) |
 | **Processing speed** (46 unseen AMI meetings, 28.5 h audio, M1 Max ANE) | 52.9× realtime | **63.9× realtime** | faster on Neural Engine |
 
-**Why this model replaced the prior INT8 spoken-form build:**
-- **Repeats and live-tail stability:** One-frame rapid repeats across 22 real calls drop 26% vs. the prior spoken-form build and sit at stock levels (0.45 vs. 0.43 per 1,000 words); filler timing stays anchored near stock rather than collapsing to single-frame spikes.
-- **Periods after numbers:** Cuts excess lost sentence-ending periods immediately after numbers by ~63–64% on both synthetic tests and unseen earnings calls.
-- **Fast speech and background noise:** At `1.4×` playback speed on long-form number stress audio, 639 of 661 figures stay intact (vs. 598 on stock); under steady background noise on Apple Neural Engine FP16, timing stays stable (0% collapse vs. 87.6% on the prior build).
-- **Honest caveats:** Held-out AMI and Earnings-22 file identifiers are kept sealed so they cannot become tuning targets (only aggregate totals are published). The unseen Earnings-22 set contains 0 GBP sites, so British pound coverage comes from the 22-call development set and synthetic checks rather than the sealed holdout. Non-English multilingual testing covers single-sentence read speech only, not multi-speaker meetings.
+**What improved in the retrained FP16 top-4 model (`9e462b9f`):**
+- **Repeats and live-tail stability:** One-frame rapid repeats across 22 real calls sit at stock levels (**0.45** vs. **0.43** per 1,000 words), and filler timing stays anchored near stock rather than collapsing to single-frame spikes.
+- **Periods after numbers:** Preserves sentence-ending periods immediately after numbers close to stock on both synthetic tests and unseen earnings calls (`74` vs. `70` lost out of 332 unseen sentence-end sites).
+- **Fast speech and background noise:** At `1.4×` playback speed on long-form number stress audio, **639 of 661** figures stay intact (vs. 606 on stock in the same `270d9cc4b` build); under steady background noise on Apple Neural Engine FP16, token timing stays stable (**0%** timing collapse across all tested contexts).
+- **Honest caveats:** Held-out AMI and Earnings-22 file identifiers are kept sealed so they cannot become tuning targets (only aggregate totals are published). The unseen Earnings-22 set contains 0 GBP sites, so British pound coverage comes from the 22-call development set and synthetic checks rather than the sealed holdout. Non-English multilingual testing on FLEURS covers single-sentence read speech only, not multi-speaker meetings.
+
+## Long-form number-seam and fast-speech stress (Break-It)
+
+Real earnings calls test spoken numbers, but most figures sit inside a single decoding window. Break-It is our synthetic multi-minute stress suite: dense spoken figures, currencies, percentages, dates, and identifiers placed across overlapping listening-window boundaries, including a `1.4×` fast-speech pass. Both columns below were decoded on the same `270d9cc4b` release binary on Apple Silicon with no transcription cache.
+
+| Stress suite | Figures | Stock Parakeet Ultra | Spoken-form FP16 top-4 | Corrupted | Invented | False repeats |
+|---|---:|---:|---:|---:|---:|---:|
+| **Multilingual seams (Break-It v1)** — 24 meetings (EN/DE/ES/FR) | 2,448 | 1,806 (73.8%) | **1,860 (76.0%, +54)** | 338 → **285** | 197 → **184** | 14 → **3** |
+| **Held-out voices (Break-It v3)** — 7 meetings (EN/DE/ES) | 931 | 856 (91.9%) | **881 (94.6%, +25)** | 72 → **48** | 25 → **22** | 8 → **0** |
+| **Held-out English edge cases (Break-It v4)** — 12 meetings (EN) | 642 | 634 (98.8%) | **641 (99.8%, +7)** | 8 → **1** | 8 → **1** | 1 → **0** |
+| **Fast speech at `1.4×` playback** — 5 EN meetings | 661 | 606 (91.7%) | **639 (96.7%, +33)** | 51 → **22** | 17 → **8** | 4 → **0** |
+
+Per-language breakdown on the multilingual stress suites (figures intact, stock → spoken-form):
+- **Break-It v1:** English `899 → 946 / 1,122` (`80.1% → 84.3%`, +47), German `433 → 434 / 510`, Spanish `362 → 363 / 510`, French `112 → 117 / 306`.
+- **Break-It v3 (held-out voices):** English `611 → 640 / 661` (`92.4% → 96.8%`, +29), German `127 → 127 / 138`, Spanish `118 → 114 / 132` (−4).
+- **Fast speech (`1.4×`):** Dropped figures fall from `4` on stock to **`0`** on the spoken-form model, and false repeats fall from `4` to **`0`**.
+
+**Caveats:** Break-It uses synthetic text-to-speech audio, not human speakers. Break-It v1 includes voices that overlap the synthetic training voices, whereas v3 and v4 use held-out voices. On v3 Spanish, the spoken-form model gets 4 fewer figures right than stock (`114` vs. `118` of `132`: 1 dropped and 17 corrupted vs. 0 dropped and 14 corrupted on stock), so non-English number accuracy is tracked alongside FLEURS (`1,604 / 1,786`, exact stock parity) rather than claimed as a win on synthetic stress alone.
 
 ---
 
-## Live streaming pipeline benchmarks (carried pending `1.0.0-rc.49` re-pin)
+## Live streaming pipeline benchmarks (2026-11-26 — `270d9cc4b`)
 
-*Carried from the 2026-10-14 build (`5346809ee`, prior spoken-form build) and 2026-09-27 build (`964e6af11`, stock Parakeet Ultra) as marked below. All pipeline axes below will be re-measured on the tagged `1.0.0-rc.49` release binary in a single pass.*
+Run date: **2026-11-26**, clean release binary of `270d9cc4b` comparing stock Parakeet Ultra (`95eaa59a`) and the shipped spoken-form FP16 top-4 model (`9e462b9f`), with all transcription and window caches disabled. Corpus: 16 AMI meetings (8.5 hours, headset mixdown — every speaker's close-talk microphone summed to one channel) and 11 Earnings-21 calls (10.3 hours, Rev.com human references with punctuation and casing). Live display stability, latency, and the live view against the script were re-recorded on `270d9cc4b` with the shipped model.
 
-Run date (pipeline sections below): 2026-10-14. Corpus: 16 AMI meetings, 8.5 hours, headset mixdown (every speaker's close-talk microphone summed to one channel). Punctuation and casing are measured on 11 Earnings-21 calls, because AMI's references are not punctuated to reference quality. Live display, latency and the live view against the script come from recorded capture sessions measured on the 2026-09-27 build, marked as such.
-
-## Headline numbers (carried pipeline pin — 2026-10-14)
+## Headline numbers
 
 | Metric | Value |
 |---|---:|
-| **Deletion rate on clean (non-overlapped) speech** | **2.7%** |
-| Deletion rate on speech spoken over another speaker | 38.1% |
+| **Deletion rate on clean (non-overlapped) speech** | **3.0%** *(1.4% on single-meeting IS1009a, fillers stripped)* |
+| Deletion rate on speech spoken over another speaker | 38.7% |
 | Runs of 10+ consecutive words lost, whole corpus | **0** in 8.5 hours |
-| Longest single run of lost words | 8 |
-| Sentence-ending punctuation, precision / recall | 88.7% / 81.2% |
-| Sentence ends preserved at speaker handoffs | 94.9% |
-| Sentence starts rendered capitalized | 82.7% |
-| Spoken numbers intact in the saved transcript | 97.6% |
-| Text shown as final that later changed | 0.31% (previous release's build) |
-| Time from you stopping speaking to the text being final | 4.9 to 8.5 s (previous release's build) |
+| Longest single run of lost words | **8** |
+| Sentence-ending punctuation, precision / recall | **89.2%** / 80.6% |
+| Sentence ends preserved at speaker handoffs | **96.2%** |
+| Sentence starts rendered capitalized | 82.1% *(capitalization precision **89.8%**)* |
+| Spoken numbers intact in the saved transcript | **97.7%** *(2,815 of 2,882; 0 window-stitch errors)* |
+| Text shown as final that later changed | **0.28%** |
+| Time from you stopping speaking to the text being final | **5.2 to 8.9 s** |
+| Determinism across cold repeat runs (27 files) | **Byte-identical** (27 of 27) |
 
 The first two rows are the pair to read together, and they are explained below.
 
 ## Word accuracy
 
-Measured against the human reference over the whole transcript, full vocabulary, no filler stop-list. Reference: 81,202 tokens across the 16 meetings, after both sides go through the same number-and-acronym normalizer, with numbers converted to digits on both sides (the product writes every number as words, and the reference writes digits).
+Measured against the human reference over the whole transcript, full vocabulary, no filler stop-list. Reference: 81,202 tokens across the 16 AMI meetings, after both sides go through the same number-and-acronym normalizer, with numbers converted to digits on both sides (the product writes English numbers as words, and the reference writes digits).
 
-| | Parakeet Ultra | Spoken-form fine-tune | change |
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 | Change |
 |---|---:|---:|---:|
-| Reference words deleted | 11,320 | 10,836 | −484 |
-| Words inserted that the reference lacks | 3,431 | 3,528 | +97 |
-| Words substituted | 4,153 | 4,287 | +134 |
-| Composite error rate | 23.28% | 22.97% | −0.31 points |
+| Reference words deleted | 11,338 | **11,139** | **−199** |
+| Words inserted that the reference lacks | 3,289 | 3,326 | +37 |
+| Actionable insertions (excluding convention/coverage gaps) | 1,304 | **1,304** | **0** |
+| Words substituted | 4,145 | **4,102** | **−43** |
+| Composite error rate (AMI-16, normalized) | 23.12% | **22.87%** | **−0.25 pp** |
 
-The fine-tune deletes 484 fewer reference words across 8.5 hours of meetings for 97 more insertions and 134 more substitutions. The residue of insertions worth acting on is level (1,358 → 1,347).
+The fine-tune deletes 199 fewer reference words and makes 43 fewer substitutions across 8.5 hours of meetings for 37 more total insertions, with actionable insertions completely flat (`1,304 → 1,304`). All 16 AMI meetings improve (`16 better, 0 worse`).
 
-**On the earnings calls it moves the same way:** deletions 2,363 → 2,020, insertions 1,755 → 1,859, error rate 9.06% → 8.81%. Scored with filled pauses and casual forms folded on both sides and numbers left out, all 27 files read 13.61% for Ultra and 13.59% for the fine-tune ([the ASR bake-off](../../asr-bakeoff/RESULTS.md#mimicscribes-spoken-form-fine-tune--the-model-the-product-ships-now) has that table against every model tested).
+**On the 11 Earnings-21 calls (97,504 normalized reference tokens):** deletions fall `2,264 → 2,068` (−196), total insertions move `1,661 → 1,718` (+57), actionable insertions fall `768 → 763` (−5), and normalized error rate falls `8.78% → 8.65%` (−0.13 pp).
 
-**We do not publish an absolute word error rate from this instrument.** The AMI reference is the time-ordered union of every speaker's channel, so where two people talk at once it interleaves words no single-stream decoder can emit in order, and each scores as an error however good the recognizer is. That bias is large and constant across builds, which is why the change is meaningful while the level is not.
+**Content WER across all 27 files (18.8 hours, 161,660 content words, filled pauses folded and numbers excluded):** stock Parakeet Ultra reads `13.67%` (AMI-16 `20.71%`, Earnings-21 `7.61%`) and the shipped FP16 top-4 fine-tune reads **`13.68%`** (AMI-16 **`20.63%`**, −0.08 pp, 95% CI −0.14 to −0.03; Earnings-21 `7.69%`, +0.08 pp, CI −0.02 to +0.21). Across those 18.8 hours, the shipped pipeline drops **9,567** content words — compared with `9,705` on stock Ultra in the same build and `14,260` on stock Parakeet v3 through FluidAudio's batch runner (**33% fewer words dropped**; see [the ASR bake-off](../../asr-bakeoff/RESULTS.md) for the historical multi-model table). On the single meeting (`IS1009a`) used in the streaming-model bake-off, clean-speech deletion with fillers stripped is **`1.4%`** (`18 of 1,273` words, vs. `1.5%` on stock Ultra in the same build and `7.1%` on the best real-time streaming model tested).
+
+**We do not publish an absolute AMI word error rate as a standalone headline.** The AMI reference is the time-ordered union of every speaker's channel, so where two people talk at once it interleaves words no single-stream decoder can emit in order, and each scores as an error however good the recognizer is. That bias is large and constant across builds, which is why the paired delta is meaningful while the raw AMI level is not.
 
 ### How hard the assignment is
 
-| | Parakeet Ultra | Spoken-form fine-tune |
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 |
 |---|---:|---:|
 | Reference words spoken over another speaker | 30.1% | 30.1% |
-| Deletion rate within overlapped speech | 38.9% | 38.1% |
-| Deletion rate on clean speech | 3.2% | 2.7% |
+| Deletion rate within overlapped speech | 39.0% | **38.7%** |
+| Deletion rate on clean speech | 3.2% | **3.0%** |
 
-Nearly a third of the words in this corpus are spoken over somebody else, and inside that population deletion runs at 38.1% against 2.7% on clean speech. That gap is close to a statement about physics: one mixed channel, two simultaneous talkers. The fine-tune's gain comes from both populations, most clearly on clean speech.
+Nearly a third of the words in this corpus are spoken over somebody else, and inside that population deletion runs at 38.7% against 3.0% on clean speech. That gap is close to a statement about physics: one mixed channel, two simultaneous talkers. The fine-tune improves both populations.
 
 ## How badly do losses clump
 
-A hundred scattered single words is a transcript you can read. One 14-word run is a missing exchange. Clean speech only:
+A hundred scattered single words is a transcript you can read. One 14-word run is a missing exchange. Clean speech only (AMI-16):
 
-| Consecutive words lost | Parakeet Ultra | Spoken-form fine-tune |
+| Consecutive words lost | Stock Parakeet Ultra | Spoken-form FP16 top-4 |
 |---|---:|---:|
-| 1 word | 1,797 | 1,768 |
-| 2 to 4 words | 461 | 434 |
-| 5 to 9 words | 13 | 11 |
+| 1 word | 1,820 | **1,793** |
+| 2 to 4 words | 465 | **435** |
+| 5 to 9 words | 13 | **12** |
 | **10 or more words** | **0** | **0** |
 | Longest single run | 8 | 8 |
+| Total clean-speech words lost | 2,966 | **2,855** (−111) |
 
-Every bucket shrinks. There is still no run of 10 or more words in 8.5 hours, and the longest is 8.
+Every non-zero bucket shrinks. There is still no run of 10 or more consecutive lost words in 8.5 hours, and the longest run is 8 words.
 
 **This table counts deletions only** and never appears without the insertion count beside it, for the reason given above.
 
@@ -98,374 +119,236 @@ Every bucket shrinks. There is still no run of 10 or more words in 8.5 hours, an
 
 *11 Earnings-21 calls, token-aligned against Rev.com human references. Scored on the speaker turns a reader actually sees.*
 
-| | Parakeet Ultra | Spoken-form fine-tune | |
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 | |
 |---|---:|---:|---|
-| Sentence-ending precision | 88.7% | 88.7% | of the sentence ends written, the share a human also placed |
-| Sentence-ending recall | 80.7% | **81.2%** | of the sentence ends a human wrote, the share found |
-| Boundary recall | 95.2% | 94.9% | sentence ends at a speaker handoff, the ones that stop two speakers running together |
-| Sentence-start capitalization | 82.5% | **82.7%** | of real sentence starts, the share capitalized |
-| Capitalization precision | 88.6% | 88.5% | counter-check: a rule that capitalizes indiscriminately buys the row above and loses this one |
+| Sentence-ending precision | 88.8% | **89.2%** | of the sentence ends written, the share a human also placed |
+| Sentence-ending recall | 81.1% | 80.6% | of the sentence ends a human wrote, the share found |
+| Boundary recall | 95.4% | **96.2%** | sentence ends at a speaker handoff, the ones that stop two speakers running together |
+| Sentence-start capitalization | 82.3% | 82.1% | of real sentence starts, the share capitalized |
+| Capitalization precision | 89.2% | **89.8%** | counter-check: a rule that capitalizes indiscriminately buys the row above and loses this one |
 
-The fine-tune finds 19 more of the sentence ends a human wrote with 3 more placed where none belonged. At speaker handoffs it misses two more (35 against 33 of about 690), and capitalization precision slips by 0.03 points. Boundary recall and capitalization precision were hard floors; both are re-set to the fine-tune's values here, stated rather than hidden, and are floors again from this release. Terminal punctuation is not cosmetic. Sentence boundaries become the windows used for speaker embedding, so a punctuation change is also a speaker-identification change.
+Compared against stock Ultra on the same `270d9cc4b` build, the spoken-form model cuts spurious sentence ends (`465 → 433`), cuts missed speaker-handoff boundaries (`32 → 26`, pushing boundary recall from `95.4%` to **`96.2%`**), and improves capitalization precision (`89.2% → 89.8%`). Missed sentence ends are nearly identical (`861 → 863`, +2 across 11 calls); the reported recall ratio dips by 0.5 points (`81.1% → 80.6%`) primarily because the aligned-token denominator is smaller when spoken-form numbers are written as words rather than matching digit reference tokens one-to-one (`tp 3,695 → 3,578`). Stray punctuation before lowercase words across all 27 files also drops (`65 → 55` stray periods, `4 → 1` stray `?`/`!`). Terminal punctuation is not cosmetic: sentence boundaries set the windows used for speaker embedding, so a punctuation change is also a speaker-identification change.
 
 ## Live display stability
 
-*Not re-measured for this model: these captures replay recorded sessions in real time and are carried from the previous release's build (2026-09-27, `964e6af11`), where the columns compare Parakeet v3 with stock Parakeet Ultra.*
+"Text shown as final stays final." The display commits in two tiers and the promise attaches only to the committed tier. Re-recorded **2026-11-26** on `270d9cc4b` with the shipped FP16 top-4 model across 4 recorded meeting sessions (`ES2004a`, `IS1009b`, `IS1009c`, `TS3003a`):
 
-"Text shown as final stays final." The display commits in two tiers and the promise attaches only to the committed tier.
-
-| | Parakeet v3 | Parakeet Ultra |
+| | Previous published (2026-09-27, stock Ultra) | Current (2026-11-26, FP16 top-4) |
 |---|---:|---:|
-| Committed text that later changed | 0.25% | **0.31%** |
-| Provisional tail text that later changed | 5.47% | 4.95% |
+| Committed text that later changed | 0.31% | **0.28%** *(541 of 191,049)* |
+| Provisional tail text that later changed | 4.95% | **4.26%** *(3,951 of 92,741)* |
 | Words the renderer dropped entirely | 0 | **0** |
-| Revisions inside the trailing 60 s, per corpus | 349 (69% single-word) | 423 (69% single-word) |
+| Revisions inside the trailing 60 s, per corpus | 423 *(69% single-word)* | **368** *(78% single-word, 94% ≤2 words)* |
 
-The committed tier holds its promise on both models, at about a third of a percent, which is roughly 16x steadier than the provisional tail. Ultra's committed text changes a little more often than v3's on the same build: 609 of 196,069 committed words against 505 of 199,579, and 423 small revisions against 349. Its provisional tail changes less. The last page read 0.33% on the build before this one.
-
-Basis: 4 recorded capture sessions, not the 16-meeting corpus. Both columns were recorded together on `964e6af11` (2026-09-27) and are carried forward as noted above pending re-recording on `1.0.0-rc.49`.
+The committed tier holds at **0.28%** (well inside the 1.0% ceiling and ~15× steadier than the provisional tail). Across the four sessions, committed edits range from `0.18%` (`ES2004a`) to `0.38%` (`IS1009c`), and trailing-60s revision events drop from `423` to `368`.
 
 ## Latency to trust
 
-*Not re-measured for this model: these captures replay recorded sessions in real time and are carried from the previous release's build (2026-09-27, `964e6af11`), where the columns compare Parakeet v3 with stock Parakeet Ultra.*
+How long after you stop speaking until the words stop moving. Measured on the same four 2026-11-26 capture sessions as the stability table above (stability and latency are always published together because committing faster trades against revision rate):
 
-How long after you stop speaking until the words stop moving.
-
-| Capture | Pauses measured | Parakeet v3 | Parakeet Ultra |
+| Capture | Pauses measured | Previous (2026-09-27, stock Ultra) | Current (2026-11-26, FP16 top-4) |
 |---|---:|---:|---:|
-| ES2004a | 46 | 8.5 s | 8.4 s |
-| IS1009b | 30 | 6.1 s | 6.7 s |
-| IS1009c | 64 | 6.4 s | 8.5 s |
-| TS3003a | 86 | 4.8 s | 4.9 s |
+| ES2004a | 46 | 8.4 s | **7.6 s** |
+| IS1009b | 30 | 6.7 s | **5.8 s** |
+| IS1009c | 62 | 8.5 s | 8.9 s |
+| TS3003a | 88 | 4.9 s | 5.2 s |
 
-**4.9 to 8.5 s** median pause-to-commit on Ultra, against 4.8 to 8.5 s on v3 through the same build and 6.9 to 9.9 s on the last page's build. Most of the gain over the last page is work on the live path, not the model. Between the two models it is level on three sessions, and IS1009c waits about two seconds longer on Ultra. Pause counts are Ultra's, and they differ slightly between models because the model decides where the pauses fall.
+Median pause-to-commit runs **5.2 to 8.9 s** (with median time to settle text at `0.0 to 1.6 s`). Pause counts differ slightly between builds because the recognizer places sentence pauses where speech stops.
 
 ## The live view against the script
 
-*Not re-measured for this model: these captures replay recorded sessions in real time and are carried from the previous release's build (2026-09-27, `964e6af11`), where the columns compare Parakeet v3 with stock Parakeet Ultra.*
+Everything above scores the final transcript or the four single-channel captures. These rows score what is on screen while you speak during two-channel live recordings (microphone plus system audio) replayed at 1× through the full live pipeline, with the rendered transcript sampled once per second. Replayed twice on a debug build of `270d9cc4b` (**2026-11-26**, FP16 top-4 model `9e462b9f`; pass 1 vs. pass 2: 0 regressions).
 
-Everything above scores the final transcript. These rows score what is on
-screen while you speak: seven two-channel recorded sessions (mic plus system
-audio, 32.9 minutes) replayed through the full live pipeline, the rendered
-transcript sampled once per second. The duplication rows need no reference —
-a span shown twice back to back is a defect whatever was said. The rest are
-checked against the session's script as performed.
+We report both the **7 original sessions** (32.9 minutes, for continuity with earlier releases) and the **expanded 12-session suite** (44.0 minutes, which adds five extra number-dense, clock-time, and multilingual recordings):
 
-| | |
-|---|---:|
-| Doubled phrases (4+ words) visible in the live view | **4 episodes** in 32.9 min |
-| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **6 episodes** |
-| Words shown fused with a fragment of themselves ("Turningning") | **0 episodes** |
-| Words shown that were never spoken | 636 |
-| Spoken words that never appeared on screen | 160 |
-| Already-shown words rewritten under the reader (flicker, case counts) | 361 of 5,037 shown, **7.2 per 100** |
-| Punctuation changed on words that stayed | 186, **3.7 per 100** |
-| A short repeat ("short short") that reached the saved transcript | 19 |
-| The other speaker's words appearing on this channel's row | 3 episodes, 0 saved (tracked, not gated) |
-| A bare fragment of a word ("ight") on screen | 2 episodes, 1 saved |
+| | 7 original sessions (32.9 min) | All 12 sessions (44.0 min) |
+|---|---:|---:|
+| Doubled phrases (4+ words) visible in the live view | **2 episodes** | **2 episodes** |
+| Short duplicated spans, punctuation-identical ("on Friday. on Friday.") | **6 episodes** | **6 episodes** |
+| Words shown fused with a fragment of themselves ("Turningning") | **0 episodes** | **0 episodes** |
+| Words shown that were never spoken | 608 | 677 |
+| Spoken words that never appeared on screen | 160 | 173 |
+| Already-shown words rewritten under the reader (flicker, case counts) | 278 of 5,035 (**5.5 per 100**) | 332 of 5,973 (**5.6 per 100**) |
+| Punctuation changed on words that stayed | 206 (**4.1 per 100**) | 249 (**4.2 per 100**) |
+| A short repeat ("short short") that reached the saved transcript | 18 | 23 |
+| The other speaker's words appearing on this channel's row | 2 episodes, 0 saved *(tracked)* | 2 episodes, 0 saved *(tracked)* |
+| A bare fragment of a word ("ight") on screen | 6 episodes, 4 saved | 6 episodes, 4 saved |
 
-Replayed 2026-09-27 on a debug build of `964e6af11`, the same 1.5 s refresh floor as the last page. The last page read 13.0 and 7.4 per 100 for flicker and punctuation changes. On v3 at the build before this one they read 7.8 and 3.9, so most of that fall is three weeks of work on the live path, and Ultra takes it the rest of the way to 7.2 and 3.7. Bare word fragments are the model's own gain: 10 on v3 at that build, 2 on Ultra.
+Against the previously published 2026-09-27 replay on the same 7 sessions, doubled phrases drop `4 → 2`, live word flicker drops `7.2 → 5.5 per 100` words shown (`361 → 278`), words shown that were never spoken drop `636 → 608`, and short repeats reaching the saved transcript drop `19 → 18`. Bare word fragments rise `2 → 6` (4 saved) and punctuation changes on unchanged words move `3.7 → 4.1 per 100`; both are re-pinned directly here rather than hidden.
 
-**The duplication rows rose, and every new episode is real speech.** Doubled phrases went from 2 to 4 and punctuation-identical duplicates from 4 to 6. Read from the saved rows, the new ones are:
-- a speaker stuttering ("this is, this is", which v3 wrote as "this this is"),
-- a speaker restarting a figure mid-sentence, shown for about a second and never saved,
-- and "That'd be great." said three times, which v3 saved identically.
+The shown/spoken rows are scored on the scripted sessions and count every distinct rendering that ever appeared, including provisional text later corrected. A misheard word charges both rows at once, so they are regression bars rather than absolute quality claims.
 
-This gate's ratchet on the duplicated-span total failed by one against the previous pin and was re-pinned to this run with that trace. It reproduced on two separate full replays, so it is not jitter.
-
-The last two rows are scored on the five sessions with a verbatim script
-(24.2 minutes, 3,346 script words) and count every distinct rendering that
-ever appeared, including provisional text later corrected. A misheard word
-charges both rows at once, so they are dominated by ordinary
-misrecognitions. They are regression bars, not quality claims: what they
-exist to catch is a build that makes the live view invent or withhold more
-than this one does.
-
-**Text that vanishes and comes back.** A separate counter watches for the live view getting *shorter*: a chunk of words disappearing from the screen and returning a moment later. **2 episodes on this replay**, the worst removing 3 words and the longest absence 7 s, against 3 on the last page's build. The range across replays of one binary is as large as the whole count, so read it as "a handful per half hour of replay", not as a value.
+**Text that vanishes and comes back.** A separate counter watches for the live view getting *shorter* — words disappearing from the screen and returning a moment later. On this replay: **0 episodes** across the 7 original sessions (down from 2 previously) and **1 episode** across all 12 sessions (worst drop 4 words, 5 s absence). Because replay timing jitter moves small episode counts by a few between passes, read it as "near zero per half hour of replay" rather than an exact constant.
 
 ### Numbers on screen
 
-Spoken quantities are checked by value rather than spelling, so "$115 million"
-and "one hundred and fifteen million dollars" count as the same number.
+Spoken quantities are checked by numeric value rather than spelling, so "$115 million" and "one hundred fifteen million dollars" count as the same number.
 
-| | |
-|---|---:|
-| Spoken quantities that reached the screen intact | 136 of 145 |
-| Rendered as a different quantity | 2 |
-| Dropped | 7 |
-| Numbers shown that nobody said | 1 |
-| Numbers damaged where two decoding windows were stitched | 0 in the final view |
+| | 7 original sessions (5 scripted) | All 12 sessions |
+|---|---:|---:|
+| Spoken quantities that reached the screen intact | **139 of 147 (94.6%)** | **213 of 227 (93.8%)** |
+| Rendered as a different quantity | **1** | **1** |
+| Dropped | 7 | 13 |
+| Numbers shown that nobody said | 1 | 8 |
+| Numbers damaged where two decoding windows were stitched | **0** | **0** |
 
-One of the five scripted sessions is a numbers-heavy earnings call and carries
-59 of the quantities; the other four are conversational and carry 17 to 24 each. This
-is a thin basis for a number-accuracy claim and is published as a regression
-bar, not as a quality figure. Against the last page: the same 136 intact, one
-more rendered as a different quantity, one fewer invented.
+Across all 12 sessions, live-screen numeric fidelity jumps from `194 of 228` (`85.1%`, 6 corrupted, 28 dropped, 22 invented on the prior 2026-11-14 pin) to **`213 of 227` (`93.8%`, 1 corrupted, 13 dropped, 8 invented, 0 splice defects)**. Even with 12 sessions, this remains a small scripted sample published as a live regression bar; the large public number evaluation is below.
 
 ### Numbers in the saved transcript
 
-The live view is one pass over the audio; the transcript you keep is the one
-that matters. The same by-value check is run on the saved transcript of the
-11 Earnings-21 calls against Rev.com's human references — about 2,880 spoken
-quantities, the densest public substrate for numbers we have.
+The live view is one pass over the audio; the transcript you keep is the one that matters. The same by-value check (scorer v10) is run on the saved transcript of the 11 Earnings-21 calls against Rev.com's human references — ~2,880 spoken quantities, both arms decoded on `270d9cc4b`:
 
-| | Parakeet Ultra | Spoken-form fine-tune |
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 |
 |---|---:|---:|
-| Spoken quantities that reached the saved transcript intact | 2,797 of 2,880 (97.1%) | **2,812 of 2,882 (97.6%)** |
-| Rendered as a different quantity | 35 | **29** |
-| Dropped | 48 | **41** |
-| Numbers in the transcript that nobody said | 74 | **72** |
+| Spoken quantities that reached the saved transcript intact | 2,787 of 2,878 (96.8%) | **2,815 of 2,882 (97.7%)** |
+| Rendered as a different quantity | 34 | **28** |
+| Dropped | 57 | **39** |
+| Numbers in the transcript that nobody said | 63 | **58** |
+| Numbers damaged where two decoding windows were stitched | 10 | **0** |
 
-By kind of number, on the fine-tune:
+By kind of number, on the shipped spoken-form FP16 top-4 model:
 
-| | scored | intact | different | dropped | nobody said |
+| | Scored | Intact | Different | Dropped | Nobody said |
 |---|---:|---:|---:|---:|---:|
-| Plain counts and amounts | 1,019 | 976 | 14 | 29 | 55 |
-| Money | 362 | 351 | 9 | 2 | 3 |
-| Percentages | 407 | 401 | 5 | 1 | 1 |
-| Years | 309 | 305 | 0 | 4 | 1 |
-| Fiscal quarters | 441 | 440 | 0 | 1 | 1 |
-| Ordinals | 265 | 259 | 1 | 5 | 7 |
+| Plain counts and amounts | 1,017 | 978 | 13 | 26 | 44 |
+| Money | 362 | 351 | 8 | 3 | 2 |
+| Percentages | 408 | 401 | 6 | 1 | 1 |
+| Years | 309 | 305 | 0 | 4 | 0 |
+| Fiscal quarters | 442 | 441 | 0 | 1 | 1 |
+| Ordinals | 265 | 259 | 1 | 5 | 6 |
 
-Both columns are the same build and the same scorer, on the transcript as saved. The scorer is newer than the one the last page used (it reads this corpus as 2,880 quantities, not 2,854), so the last page's 2,730 of 2,854 is not a comparison: on today's scorer the previous release reads 2,790 of 2,880.
+*(Smaller categories in the by-kind breakdown: 64 compound quantities [63 intact, 1 dropped, 1 nobody said], 14 basis-point figures [14 intact, 1 nobody said], and 3 clock times [3 intact, 2 nobody said] — accounting for the remaining 4 invented figures to reach 58 total. The by-kind table sums to 2,884 scored / 41 dropped vs. 2,882 / 39 in the headline table because two truncated-year items at clip boundaries are excluded from the headline totals while remaining in the category breakdown.)*
 
-This table is what a change to number handling is gated on, by kind of number,
-and it is published as a regression bar; the substrate is prepared remarks read
-from a page, so it says nothing about numbers spoken over another speaker.
-
-<!-- BEGIN GENERATED: reader-visible residual (scripts/generate_public_results.py --live-transcription) -->
+Every defect class drops simultaneously against stock Ultra on the same build: corrupted figures `34 → 28`, dropped figures `57 → 39`, invented figures `63 → 58`, and window-stitch splice defects **`10 → 0`**. This table is gated per call and by category; because the substrate is prepared financial remarks read cleanly, it does not measure numbers spoken over another speaker.
 
 ## Words the recovery layer adds
 
-Where the decoder emitted nothing over voiced audio, or where two
-decoding windows are stitched, a repair pass puts words back. That
-pass is the only mechanism on this page that can ADD text, so it is
-the only one that can put a sentence on screen nobody said. Deletion
-counts are blind to it by construction and so is the clumping table.
+Where the decoder emitted nothing over voiced audio, or where a pause triggers an end-of-turn recovery pass, a repair pass puts words back. That pass can add text, so deletion counts alone are blind to its errors.
 
-| | resolved against the alignment | said within a second |
+| | Resolved against the alignment | Said within a second |
 |---|---:|---:|
-| Words added per meeting-hour | 30.1 | 30.1 |
-| of which the reference supports | 16.9 | 15.8 |
-| **of which wrong** | **13.2** | 14.3 |
-| Precision | **56.3%** | 52.6% |
+| Words added per meeting-hour (reached saved transcript) | 157.9 | 157.9 |
+| of which the reference supports | 129.3 | 112.7 |
+| **of which wrong** | **28.7** | 45.2 |
+| Precision | **81.8%** | 71.4% |
 
-27 files, 18.83 hours. The repair pass added
-593 words and 567 of them reached the saved
-transcript; the table is over those, because they are the ones anybody
-read.
+27 files, 18.83 hours (`270d9cc4b`, spoken-form FP16 top-4). The logged recovery passes added 3,109 words and 2,974 of them reached the saved transcript; the table is over those 2,974 words because they are the ones a reader sees. Compared against stock Ultra on the same build (`2,999` reached, `29.5` wrong/h, `81.5%` aligned precision), the spoken-form model is slightly cleaner.
 
-**Added and later removed: 26.** 26 of the added words were taken
-out again by a later pass before anything was saved, so no reader ever
-met them. They are not wrong words on a page; they are the repair pass
-producing text something else had to clean up, which is a different
-thing and is counted as its own line rather than folded into the rate
-above. Folded in they would add 1.38 to the wrong-words row.
+**Added and later removed: 135 (`7.17/h`).** These 135 words were removed by a later pass before anything was saved, so no reader saw them. They are reported on their own line rather than folded into the reader-visible error rate above.
 
-The left column is the headline. Both definitions ask whether an added
-word belongs; they differ in what counts as belonging. The right column
-asks only whether the same word was spoken within a second, so a repair
-word standing where a different word was said reads as correct there.
-156 of the added words are exactly that, and a reader
-sees every one of them as a wrong word. The left column resolves each
-added word through the same alignment the error counts above use, which
-is why it is the one pinned.
+By logged repair class, on the headline aligned definition (words reaching the saved transcript):
 
-By repair class, on the headline definition:
-
-| | added | supported | wrong | precision |
+| | Added | Supported | Wrong | Precision |
 |---|---:|---:|---:|---:|
-| The stitch between two decoding windows | 96 | 50 | 46 | 52.1% |
-| Silence the decoder left over voiced audio | 471 | 269 | 202 | 57.1% |
+| End-of-turn recovery pass | 2,729 | 2,287 | 442 | **83.8%** |
+| Silence the decoder left over voiced audio | 245 | 147 | 98 | 60.0% |
 
-This is published as a regression bar and not as a quality claim. The
-measured admission rules that would raise the precision were all
-refuted on held-out files, so the number is what the shipping
-configuration does, stated rather than improved.
-
-*Basis: 27 files, 18.83 hours, measured at `5346809ee` on a ledgered run. This is a different arm from the word-accuracy and punctuation rows above, which is stated here rather than left to provenance; see the provenance table.*
+**Scope caveat:** On the current merge pipeline, the recovery ledger instruments end-of-turn and voiced-hole repairs; window-stitch repairs are not yet emitted into this ledger and are therefore excluded from these totals (tracked for the next pipeline milestone). Do not compare these totals directly against earlier 2026-10-14 ledger totals that logged window stitches and voiced holes without the end-of-turn pass.
 
 ## Hallucinated rows
 
-The subset of the above that reads as invented text rather than as a
-misheard word: a stretch of added words with nothing right in it. One
-wrong word inside a stretch that recovered four is an over-reach; a
-stretch with nothing right in it is a phrase on screen that was never
-spoken.
+The subset of recovery additions that reads as invented text rather than a misheard word: a stretch of added words with nothing right in it. The unit is a **run** — the added words of one repair decision, split wherever two consecutive words are more than 1.5 s apart.
 
-The unit is a RUN: the added words of one repair decision, cut wherever
-two of them are more than 1.5 s apart. One repair decision can splice
-words back in several places, so a run is a fragment of a decision and
-not the decision itself, and the run is what a reader meets on the page.
-Both counts are given below.
-
-| | resolved against the alignment | said within a second |
+| | Resolved against the alignment | Said within a second |
 |---|---:|---:|
-| All-wrong runs per meeting-hour | **5.89** | 7.06 |
-| Words in them, per meeting-hour | **9.51** | 12.11 |
-| Of 3 words or more, per meeting-hour | **0.64** | 0.96 |
+| All-wrong runs per meeting-hour | **4.73** | 6.43 |
+| Words in them, per meeting-hour | **17.63** | 27.40 |
+| Of 3 words or more, per meeting-hour | **1.75** | 2.60 |
 
-111 all-wrong runs of 306 runs on the headline
-definition, carrying 179 words, 12 of the runs three
-words or longer, over 18.83 hours. The three-word row is the one that
-matters to a reader: a one-word all-wrong run is an ordinary
-misrecognition, and a three-word one is a sentence fragment nobody said.
+89 all-wrong runs of 475 total runs on the headline aligned definition, carrying 332 words, with 33 runs of three words or longer over 18.83 hours (stock Ultra on the same build: `5.15` runs/h, `17.84` words/h, `1.70` runs ≥3w/h). Counted by whole repair decision rather than run, the same rows read 46 all-wrong decisions of 360 (63 on the surface definition). 15 of the 89 all-wrong runs consist entirely of words removed before saving; they stay in this count because the unit is what the repair pass produced.
 
-Counted by whole repair DECISION rather than by run, the same rows read
-25 all-wrong decisions of 71
-(25 on the surface definition). That count is
-smaller because one decision that gets a word right anywhere rescues
-every fragment of itself, including a fragment several seconds away with
-nothing right in it. The per-run count is what is pinned, for that
-reason; the per-decision count is given so the two are not confused.
+This class remains open: simple admission rules measured against it cost more true recovered words than wrong ones removed, so it is published and ratcheted rather than claimed solved.
 
-These counts are over all 593 added words. The section above is over
-the 567 of them that reached the saved transcript, because its question
-is what a reader met; this one's unit is a repair decision's own
-fragment, so it counts the phrase the pass produced whether or not a
-later pass took it out again.
+## Invented phrases over silence (primary decode)
 
-10 of the 111 all-wrong runs are made entirely of words a later
-pass removed before the transcript was saved, so nobody read those.
-They stay in this count: the unit here is the repair decision's own
-fragment and the pass produced the phrase either way. The
-reader-visible split is made in the section above, and the number is
-stated here so the difference between the two sections is visible
-rather than inferred.
+The hallucinated-rows section only inspects recovery passes; text emitted by the primary decoder itself over silent room tone never enters the recovery ledger. We measure it separately on AMI-16 (8.51 hours) by checking every unsupported run of 3 or more content words whose audio RMS sits at least 25 dB below the meeting's speech level (separating silence hallucinations from untranscribed human speech).
 
-This class is open. Every admission rule measured against it (word
-confidence, name shape, digit shape, run length, corroboration by a
-second read of the same audio) either failed to separate it from real
-recovered speech or cost more true words than it removed wrong ones. It
-is published because it is the residual a reader can see, not because it
-is solved.
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 |
+|---|---:|---:|
+| Over-silence runs per meeting-hour | 2.23 *(19 runs)* | **2.35** *(20 runs)* |
+| Words in them, per meeting-hour | 14.3 *(122 words)* | **14.7** *(125 words)* |
+| Runs in the final 15 seconds of a file | 2 | **2** |
 
-*Basis: 27 files, 18.83 hours, measured at `5346809ee` on a ledgered run. This is a different arm from the word-accuracy and punctuation rows above, which is stated here rather than left to provenance; see the provenance table.*
+Both columns run on `270d9cc4b`. Compared against the prior 2026-10-14 spoken-form release (`2.70` runs/h, `16.2` words/h, `2` tail runs), silence hallucinations drop by 3 runs and 13 words over 8.5 hours. The two tail runs sit at the end-of-recording finalize decode on `EN2006b` and are pinned with zero tolerance so the finalize path cannot silently widen.
 
 ## Saved-transcript duplicates
 
-"It repeats itself" is the question users ask about a transcript, so
-it is measured rather than argued about. A duplicate here is a span of
-two or more words ending one row and opening the next.
+"It repeats itself" is a common question about meeting transcripts, so we measure every span of two or more words ending one saved row and opening the next across all 27 files (18.83 hours).
 
-| | |
-|---|---:|
-| Repeated spans per meeting-hour | **2.87** |
-| Share that sit on a speaker change | **92.6%** |
-| Removed by the shipped de-duplication rule | 0 |
+| | Stock Parakeet Ultra | Spoken-form FP16 top-4 |
+|---|---:|---:|
+| Repeated spans per meeting-hour | 2.97 *(56 spans)* | **3.08** *(58 spans)* |
+| Share that sit on a speaker change | 98.2% *(55 of 56)* | **98.3%** *(57 of 58)* |
+| Removed by the shipped intra-row de-duplication rule | 0 | **0** |
 
-54 spans in 18.83 hours across 27 files;
-50 of them fall where the two rows belong to
-different speakers.
-
-The speaker-change share is the finding, not the count. These are
-overwhelmingly two people saying the same short thing in turn: "Thank
-you." answered with "Thank you.", "Go ahead." answered with "Go ahead,
-Carolina." That is what a transcript is supposed to show, and a rule that
-collapsed them would delete a real exchange. That is why this row is
-tracked and not ratcheted, and why the shipped de-duplication rule, which
-works inside a row, is left unable to reach across one.
+The speaker-change share is the finding, not the count. Nearly every span (`57 of 58`) is two speakers saying the same short phrase in turn ("Good morning." / "Good morning.", "Thank you." / "Thank you."). Collapsing those would delete real conversation, so this metric is tracked rather than ratcheted and the shipped de-duplication rule operates only inside a row.
 
 ## Wrong figures by magnitude
 
-A wrong number is not one thing. `$17 million` for `$17.5 million`
-misstates a figure; `$40 billion` read as `$40 million` misstates it
-by a factor of a thousand, and only one of those changes what the
-sentence means. This is the same population as the "rendered as a
-different quantity" row of the saved-transcript table above, split by
-how far the rendered value is from the spoken one:
+A wrong number is not one thing: `$17 million` for `$17.5 million` is a small error, while `$40 billion` written as `$40 million` is off by a factor of a thousand. This splits the 28 corrupted figures from the saved-transcript table above by ratio (`|rendered / reference|`, folded to `>= 1`):
 
-| Wrong by a factor of | | |
-|---|---:|---|
-| under 10x | 19 | tracked |
-| 10x to under 1,000x | 8 | tracked |
-| 1,000x or more | 2 | tracked, see below |
+| Wrong by a factor of | Stock Parakeet Ultra | Spoken-form FP16 top-4 | Status |
+|---|---:|---:|---|
+| Under 10× | 19 | **18** | tracked |
+| 10× to under 1,000× | 10 | **8** | tracked |
+| 1,000× or more | 5 | **2** | tracked, named below |
 
-29 corruptions in total, neither more nor fewer than that row.
-The ratio is folded, so an amount rendered a thousand times too
-large and one rendered a thousand times too small count the same.
+Every member of the `1,000× or more` row on the shipped model:
 
-**The bottom row is tracked, not a bar, and here is why.** It is a split
-of a comparison against reference entities, not a count of wrong figures
-a reader would meet, and most of what is in it is the comparison rather
-than the transcript. Every member, named:
-
-| the reference says | the transcript says | what it is |
+| The reference says | The transcript says | What it is |
 |---|---|---|
-| `100` | `a hundred billion, a hundred million dollar` | the speaker corrected themselves ("100 billion… $100 million") and the scorer paired the correction as one entity |
-| `$40 billion` | `forty million dollars` | a real disagreement about the scale word at the site (the same site as on stock Ultra) |
+| `100` | `hundred billion` | the speaker corrected themselves ("100 billion… $100 million") and the scorer paired the correction against the first token |
+| `$40 billion` | `forty million dollars` | a real disagreement about the scale word at the site (same site as on stock Ultra) |
 
-One of them is a real error in the transcript: a scale word wrong. The
-other is the scorer pairing a self-correction as one entity. Stock Ultra
-on the same build has both of these plus two the fine-tune gets right:
-"$1 billion $295 million" written a thousand times too small, and "200
-to 250,000" written "two hundred thousand, two hundred fifty thousand".
-Counting those as regressions would gate future releases against the
-reference's coverage and the scorer's tokenizer, so the row is published
-and not enforced.
+Stock Ultra on the same build has both of these plus three additional `1,000×+` corruptions the spoken-form model gets right (including `$1 billion $295 million` rendered as `$1,295,000` and `200` rendered as `200,000`).
 
-**What is enforced instead** is the narrower question the row was
-reaching for: a figure where the transcript and the reference both name
-a scale and name a different one. That is one site on this corpus: "$40
-billion", written "forty million dollars" by both models. Stock Ultra on
-the same build also writes "$1 billion $295 million" a thousand times
-too small; the fine-tune gets it right, and it is pinned at 1
-with no tolerance. It excludes every case above where the disagreement
-is one side having no scale word at all, which is where the readings
-live.
+**What is enforced instead** is the narrower bar where both transcript and reference name a scale word (`hundred`/`thousand`/`million`/`billion`/`trillion`) and disagree on the largest scale word: **1 site** (`$40 billion` → `forty million dollars`), pinned at `1` with zero tolerance.
 
 ## Per-file sign counts
 
-Every delta on this page is a corpus total, and a total can hide a
-split: a few files improving a lot while the rest drift the other way
-nets out the same as everything moving a little. The substrate is
-deterministic run to run, so the noise on these totals is which files
-are in the corpus, not measurement jitter, which makes the sign counts
-the honest denominator for every change column above.
+Corpus totals can hide a split where a few files carry the whole gain while the rest regress. Because the batch pipeline is byte-deterministic, file-to-file sign counts are the honest denominator for the paired stock vs. spoken-form changes above (scored on each file's normalized error rate):
 
-| Delta on this page | files | better | worse | unchanged |
+| Delta on this page (Stock → Spoken-form FP16 top-4) | Files | Better | Worse | Unchanged |
 |---|---:|---:|---:|---:|
-| Word accuracy (16 AMI meetings) | 16 | 14 | 2 | 0 |
-| Earnings calls (11 Earnings-21 calls) | 11 | 9 | 1 | 1 |
-| Both corpora together (27 files) | 27 | 23 | 3 | 1 |
+| Word accuracy (16 AMI meetings) | 16 | **16** | **0** | 0 |
+| Earnings calls (11 Earnings-21 calls) | 11 | **8** | 3 | 0 |
+| **Both corpora together (27 files)** | **27** | **24** | **3** | **0** |
 
-Scored on each file's own error rate, on the same normalized basis as
-the word-accuracy table. `unchanged` is exact equality: on a
-deterministic substrate a file that does not move did not move at all.
-
-The files that moved the wrong way are `4387332`, by 0.05 points, `ES2004c`, by 0.26 points, `IS1003b`, by 0.46 points.
+The three files that moved slightly worse are `4366522` (+0.35 pp), `4366893` (+0.05 pp), and `4367535` (+0.60 pp).
 
 ## Added decodes
 
-**None this release.** No decoding site was added to the product path,
-so no second pass of the audio is paid for on your machine that was not
-paid for on the last build. Every recovery number above comes from an
-admission decision over words a decode already produced.
-
-This line is a pinned field rather than a sentence somebody remembered
-to update: a new decode has to be declared in the pin before it can
-ship, and it is declared with what it costs: where it runs, what
-triggers it, seconds of audio re-decoded per meeting-hour, and the
-words it recovered per hour.
-
-<!-- END GENERATED: reader-visible residual -->
+**None this release.** No extra decoding site was added to the product path; every recovery number above comes from existing decode passes.
 
 ## Determinism
 
-Same audio in, byte-identical transcript out, verified rather than asserted. On the previous release's build (2026-09-27), all 27 files were decoded twice from cold, with no cache of any kind, and the two runs agreed byte for byte on every stage the pipeline writes: 216 of 216 per-file dumps. The fine-tune changes only model weights, so this was not repeated for this page; it is carried, and marked as carried in the provenance table.
+Same audio in, byte-identical transcript out, verified rather than asserted. On **2026-11-26** (`270d9cc4b`, shipped FP16 top-4 model `9e462b9f`), all 27 files (16 AMI + 11 Earnings-21) were decoded twice from cold with no ASR cache: **27 of 27** saved-transcript JSON files agreed **byte for byte (`0` diffs)**.
 
-Sampling-based systems cannot claim this, and it is load-bearing for everything above: a comparison between two configurations means nothing unless each is reproducible alone.
+## Speed and memory on Apple Silicon
+
+Quiet-machine release measurements on an M1 Max (10-core, 32 GB, macOS 27.0) with the shipped FP16 top-4 model (`9e462b9f`; memory, CPU, and pipeline throughput on `270d9cc4b`, first-launch compile on `005e86e2d` with the same `9e462b9f` weights):
+
+| Measurement | Value | Basis |
+|---|---:|---|
+| Idle memory (`phys_footprint`) | **239 MB** | 90 s idle against real DB (peak 250 MB) |
+| Active meeting memory (`phys_footprint`) | **~600 MB** *(592–603 MB steady)* | Live 2-channel replay (ASR + diarization + echo cancellation; 734 MB warmup peak) |
+| Active meeting CPU | **33% median** *(38% mean of 1 core)* | 60 s steady-state live replay (~3–4% of 10-core CPU) |
+| First-launch Neural Engine compile | **~27 s** *(26.7 s)* | Empty compile cache, one-time per model revision (`005e86e2d`, 2026-11-25) |
+| Batch pipeline throughput | **41.9×–56.5× realtime** *(27 files)* | Cold-ASR pipeline 41.9×; warm-embedding repeat 56.5×; 46-AMI holdout 63.9× |
+
+Full methodology and how to measure your own machine with `footprint` are documented in [Performance & Memory](https://mimicscribe.app/docs/performance).
 
 ## Corpora and caveats
 
 - **[AMI Meeting Corpus](https://groups.inf.ed.ac.uk/ami/corpus/)** (CC BY 4.0), 16 meetings, 8.5 hours, the Mix-Headset mixdown: every speaker's close-talk microphone summed to one channel, so overlapped speech is fully present and there is no room reverberation. Scored against the union of all speaker channels *including* overlapped speech, the hardest fair reading.
-- **[Earnings-21](https://github.com/revdotcom/speech-datasets)**, 11 earnings calls with Rev.com human references including punctuation and casing.
+- **[Earnings-21](https://github.com/revdotcom/speech-datasets)**, 11 earnings calls (10.3 hours) with Rev.com human references including punctuation and casing.
+- **Break-It synthetic stress sets** (v1, v3, v4, and `1.4×` fast-speech): synthetic TTS multi-minute audio packed with cross-window spoken numbers, currencies, dates, and identifiers.
 
-Benchmark numbers come from fixed public corpora, not from your meetings. Real meetings vary, and accents, cross-talk, background noise and call-audio quality all change what the recognizer hears in the first place.
+Benchmark numbers come from fixed corpora, not from your meetings. Real meetings vary, and accents, cross-talk, room reverberation, background noise, and call-audio quality all change what the recognizer hears.
 
-This is not the far-field condition. A single distant microphone in the same room would score worse, and results on the two are not comparable; an earlier version of this page described the corpus as far-field, which was wrong (corrected 2026-09-03 after hash-matching the audio against the AMI mirror).
+This is not a far-field room-microphone condition. A single distant microphone in a reverberant room scores worse, and results on the two are not comparable; an earlier version of this page described AMI-16 as far-field, which was wrong (corrected 2026-09-03 after hash-matching the audio against the AMI mirror).
 
-The word-accuracy figures above are AMI only. Earnings-21 appears on this page for punctuation and casing, and the two corpora are not aggregated.
+AMI-16 and Earnings-21 are reported separately for every axis where they measure different things (overlap and loss clumping on AMI; punctuation, casing, and saved numbers on Earnings-21), and shown both per-corpus and pooled on the 27-file content WER and per-file sign-count tables.
 
 ## Provenance
 
@@ -473,27 +356,24 @@ The word-accuracy figures above are AMI only. Earnings-21 appears on this page f
 |---|---|---|---|
 | Unseen AMI holdout (raw WER & speed) | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 46 unseen AMI meetings (~282k words, aggregate-only) |
 | Unseen Earnings-22 holdout (numbers, currency, stops) | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 10 unseen Earnings-22 calls (2,425 figures, aggregate-only) |
-| 22 real earnings calls & 27-file content WER | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 22 calls (5,606 figures) + 16 AMI / 11 E21 (161,660 words) |
-| Multilingual WER & non-English numbers | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 25 languages on FLEURS (6,039 + 800 clips) |
-| Word accuracy, loss clumping, crosstalk split | `5346809ee` | 2026-10-14, **carried** | 16 AMI meetings |
-| Sentence punctuation and casing | `5346809ee` | 2026-10-14, **carried** | 11 Earnings-21 calls |
-| Numbers in the saved transcript | `5346809ee` | 2026-10-14, **carried** | 11 Earnings-21 calls (2,882 quantities) |
-| Words the recovery layer adds | `5346809ee` | 2026-10-14, **carried** | 27 files, 18.83 hours, ledgered run |
-| Hallucinated rows | `5346809ee` | 2026-10-14, **carried** | the same ledgered run |
-| Invented phrases over silence | `5346809ee` | 2026-10-14, **carried** | 16 AMI meetings, 8.51 hours, its own token-frame arm |
-| Wrong figures by magnitude | `5346809ee` | 2026-10-14, **carried** | 2026-10-14 arm's 29 corruptions, split by ratio |
-| Saved-transcript duplicates | `5346809ee` | 2026-10-14, **carried** | 27 files, 18.83 hours |
-| Per-file sign counts | `5346809ee` | 2026-10-14, **carried** | 2026-10-14 pair of arms, 27 files |
-| Determinism | `964e6af11`, decoded twice | 2026-09-27, **carried** | 27 files (16 AMI + 11 Earnings-21) |
-| Live display stability | `964e6af11` | 2026-09-27, **carried** | 4 capture sessions |
-| Latency to trust | `964e6af11` | 2026-09-27, **carried** | the same 4 capture sessions |
-| Live view against the script | `964e6af11`, debug build | 2026-09-27, **carried** | 7 capture sessions (script rows: 5) |
+| 22 real earnings calls (numbers, repeats, stability) | `27d658215705` (model `9e462b9f`) | **2026-11-25** | 22 calls (5,606 figures) |
+| Multilingual WER & non-English numbers | `5dbccc68543c` (model `9e462b9f`) | **2026-11-25** | 25 languages on FLEURS (6,039 + 800 clips) |
+| Break-It long-form seams & `1.4×` fast speech | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | v1 (24), v3 (7), v4 (12), `1.4×` (5 EN) — paired stock vs. spoken |
+| Word accuracy, content WER, loss clumping, crosstalk split | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 16 AMI meetings + 11 Earnings-21 calls (cold decode) |
+| Sentence punctuation and casing | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 11 Earnings-21 calls (post-merge rows) |
+| Numbers in the saved transcript & magnitude split | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 11 Earnings-21 calls (2,882 quantities, scorer v10) |
+| Recovery additions & hallucinated rows | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 27 files, 18.83 h, ledgered run (end-of-turn + voiced-hole) |
+| Invented phrases over silence | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 16 AMI meetings, 8.51 h |
+| Saved-transcript duplicates & per-file sign counts | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 27 files, 18.83 h, paired cold decode |
+| Determinism | `270d9cc4b`, decoded twice cold | **2026-11-26** | 27 files (27/27 byte-identical) |
+| Live display stability & latency to trust | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | 4 freshly recorded capture sessions |
+| Live view against the script & live numbers | `270d9cc4b`, debug build (model `9e462b9f`) | **2026-11-26** | 12 two-channel sessions × 2 passes (7 original shown beside 12) |
+| Footprint, CPU & pipeline speed | `270d9cc4b` (model `9e462b9f`) | **2026-11-26** | M1 Max 10-core 32 GB, macOS 27.0, quiet machine |
+| First-launch Neural Engine compile | `005e86e2d` (model `9e462b9f`) | **2026-11-25** | M1 Max 10-core 32 GB, macOS 27.0, empty compile cache |
 
-**One build, two models.** Every 2026-11-25 model comparison above runs stock Parakeet Ultra (`95eaa59a`) and the spoken-form FP16 top-4 fine-tune (`9e462b9f`) through the same release binary (`27d658215705`) with fresh per-arm sandboxes and no transcription cache. Likewise, every carried 2026-10-14 pipeline row compared stock Ultra and the earlier `5edfc817` fine-tune on `5346809ee`.
+**One build, two models.** Every paired comparison above runs stock Parakeet Ultra (`95eaa59a`) and the spoken-form FP16 top-4 fine-tune (`9e462b9f`) through the exact same release binary with fresh per-arm sandboxes and no transcription cache.
 
-**The scoring basis is stated because it matters.** The product writes English numbers as spoken words, so corpus word-accuracy scorers align numbers on one basis (`MIMICSCRIBE_ITN_NUMBERS=1` on the carried 2026-10-14 pipeline rows; content-word Levenshtein on the 2026-11-25 27-file check; raw full-vocabulary WER on the 46-meeting unseen AMI holdout). All number rows score the transcript as saved by numeric value.
-
-**Carried rows** measure the live streaming pipeline and replay sessions from earlier builds; they are explicitly dated and marked carried here rather than presented as re-measured on the FP16 top-4 model.
+**The scoring basis is stated because it matters.** The product writes English numbers as spoken words, so corpus word-accuracy scorers align numbers on one basis (digit-normalized scoring on both sides for the pipeline word-accuracy and loss-clumping rows; content-word Levenshtein excluding numbers on the 27-file content WER row; raw full-vocabulary WER on the 46-meeting unseen AMI holdout). All number rows score the transcript as saved by numeric value.
 
 Current model: MimicScribe's spoken-form FP16 top-4 fine-tune of Parakeet Ultra (`MimicScribe/parakeet-ultra-spoken-coreml` at `9e462b9f`, top-4 Conformer encoder layers in FP16 plus decoder and joint weights on `FluidInference/parakeet-ultra-coreml` at `95eaa59a`), Apple Silicon. The stock Parakeet Ultra column is `95eaa59a` unmodified.
 
@@ -506,127 +386,75 @@ The values the next release is measured against. A pin is not a target; it is th
 | Renderer dropped words | must not worsen | 0 |
 | Runs of 10+ consecutive words lost | must not rise | 0 |
 | Longest single run of lost words | must not rise | 8 |
-| Reference words deleted | regression bar | 10,836 |
-| Words inserted, actionable | regression bar | 1,347 |
-| Clean-speech deletion rate | regression bar | 2.7% |
-| Committed text later changed | ceiling 1.0% | 0.31% |
-| Sentence-ending recall | must not worsen | 81.2% |
-| Boundary recall at speaker handoffs | must not worsen | 94.9% |
-| Sentence-start capitalization | regression bar | 82.7% |
-| Capitalization precision | must not worsen | 88.5% |
-| Doubled phrases visible live | regression bar | 4 |
-| Punctuation-identical duplicated spans | regression bar | 6 |
+| Reference words deleted (AMI-16, ITN) | regression bar | 11,139 |
+| Words inserted, actionable (AMI-16, ITN) | regression bar | 1,304 |
+| Clean-speech deletion rate (AMI-16) | regression bar | 3.0% |
+| Committed text later changed | ceiling 1.0% | 0.28% |
+| Sentence-ending recall (E21-11 rows) | must not worsen | 80.6% |
+| Boundary recall at speaker handoffs | must not worsen | 96.2% |
+| Sentence-start capitalization | regression bar | 82.1% |
+| Capitalization precision | must not worsen | 89.8% |
+| Doubled phrases visible live (7 / 12 sessions) | regression bar | 2 / 2 |
+| Punctuation-identical duplicated spans (7 / 12 sessions) | regression bar | 6 / 6 |
 | Words shown fused with a fragment of themselves | regression bar | 0 |
-| Words shown never spoken | regression bar | 636 |
-| Spoken words never shown | regression bar | 160 |
-| Already-shown words rewritten (flicker), per 100 shown | regression bar, same refresh cadence | 7.2 |
-| Punctuation changed on unchanged words, per 100 shown | regression bar, same refresh cadence | 3.7 |
-| Short repeats reaching the saved transcript | regression bar (7-session sum of rises) | 19 |
-| Other channel's words on this channel's row | tracked (row timing cannot separate bleed from coincidence) | 3 |
-| Bare word fragments on screen | regression bar | 2 |
-| Spoken quantities rendered as a different quantity | regression bar | 2 |
-| Spoken quantities dropped | regression bar | 7 |
-| Numbers shown that nobody said | regression bar | 1 |
-| Saved-transcript quantities rendered as a different quantity | must not rise, per call | 29 |
-| Saved-transcript quantities dropped | must not rise, per call | 41 |
-| Saved-transcript numbers nobody said | must not rise, per call | 72 |
+| Words shown never spoken (7 / 12 sessions) | regression bar | 608 / 677 |
+| Spoken words never shown (7 / 12 sessions) | regression bar | 160 / 173 |
+| Already-shown words rewritten (flicker), per 100 shown (7 / 12) | regression bar, same refresh cadence | 5.5 / 5.6 |
+| Punctuation changed on unchanged words, per 100 shown (7 / 12) | regression bar, same refresh cadence | 4.1 / 4.2 |
+| Short repeats reaching the saved transcript (7 / 12) | regression bar | 18 / 23 |
+| Other channel's words on this channel's row | tracked | 2 |
+| Bare word fragments on screen | regression bar | 6 |
+| Live spoken quantities rendered as a different quantity (7 / 12) | regression bar | 1 / 1 |
+| Live spoken quantities dropped (7 / 12) | regression bar | 7 / 13 |
+| Live numbers shown that nobody said (7 / 12) | regression bar | 1 / 8 |
+| Saved-transcript quantities rendered as a different quantity | must not rise, per call | 28 |
+| Saved-transcript quantities dropped | must not rise, per call | 39 |
+| Saved-transcript numbers nobody said | must not rise, per call | 58 |
+| Saved-transcript window-stitch number splices | must not rise | 0 |
 | Figures where the scale word disagrees | must not rise, tolerance 0 | 1 |
-| Wrong words the recovery layer adds, per hour | regression bar | 13.2 |
-| Added words removed again before saving, per hour | tracked | 1.38 |
-| Hallucinated runs per hour | regression bar | 5.89 |
-| Words in them, per hour | regression bar | 9.51 |
-| Of 3 words or more, per hour | regression bar | 0.64 |
-| Invented phrases over silence, per hour | regression bar | 2.70 |
-| Words in them, per hour | regression bar | 16.2 |
+| Wrong words the recovery layer adds, per hour (end-of-turn + voiced-hole) | regression bar | 28.7 |
+| Added words removed again before saving, per hour | tracked | 7.17 |
+| Hallucinated runs per hour (end-of-turn + voiced-hole) | regression bar | 4.73 |
+| Words in them, per hour | regression bar | 17.63 |
+| Of 3 words or more, per hour | regression bar | 1.75 |
+| Invented phrases over silence, per hour | regression bar | 2.35 |
+| Words in them, per hour | regression bar | 14.7 |
 | Of them in the last 15 seconds of a file | must not rise | 2 |
-| Duplicate spans per hour | tracked | 2.87 |
+| Duplicate spans per hour | tracked | 3.08 |
 | Decodes added to the product path | declared before it ships | none |
 | Determinism | must hold | byte-identical |
 
-**Pins that moved the wrong way with the model, re-set deliberately** (each against stock Parakeet Ultra on the same build):
-- boundary recall at speaker handoffs (95.2% → 94.9%, two more of about 690 missed) and capitalization precision (88.6% → 88.5%), both hard floors;
-- wrong words the recovery layer adds (12.7 → 13.2 per hour) and the hallucinated runs among them (5.74 → 5.89 per hour; the 3-word-or-longer ones fell, 0.74 → 0.64);
-- duplicate spans across a row boundary (2.81 → 2.87 per hour, tracked);
-- invented phrases over silence (2.59 → 2.70 per hour: 23 runs against 22 in 8.5 hours, with fewer words in them, 16.7 → 16.2).
-
-Stock Ultra on this build reproduces the last page's invented-phrases pin exactly, so that rise is the model and not the build. Each of these is a model trade published beside the gains above, not a relaxed bar: from this release they are floors and ceilings again.
-
-The live-view bars are enforced per session with a measured tolerance for
-replay timing jitter (the same recording replayed twice moves the word
-counts by a few dozen), plus a tighter cap on the total across sessions —
-uncorrelated jitter and a systematic regression separate cleanly there.
+The live-view bars are enforced per session with a measured tolerance for replay timing jitter (the same recording replayed twice moves the word counts by a few dozen), plus a tighter cap on the total across sessions — uncorrelated jitter and a systematic regression separate cleanly there.
 
 Three rules govern how these may be read, and each exists because ignoring it produced a wrong published number here at least once:
 
 1. **A number is only valid for the configuration that ships, on the corpus it claims.** Two numbers on an earlier version of this page were not: one set was five weeks stale, the other came from a policy reachable only by disabling the shipping one. Both read exactly like current numbers. A third case was caught before it reached this page — a punctuation figure computed over 2 of the 11 calls — which is why the gate now checks how many files produced a number before comparing it to anything.
 2. **Deletion-only measures never appear alone.** A mechanism that recovers words by inventing them improves every deletion count here, so insertions are published beside deletions or neither is published.
-3. **An unchanged result must be proven to have run.** A cached decode once reported an entire change as having no effect with every gate green. The Ultra arm above is a fully cold decode, and an arm that reports no cache misses is discarded rather than believed.
+3. **An unchanged result must be proven to have run.** A cached decode once reported an entire change as having no effect with every gate green. Both arms above are fully cold decodes, and an arm that reports no cache misses is discarded rather than believed.
 
-Every number on this page is produced by a committed script that a later release can re-run. An earlier version carried a family of figures whose analysis code was never committed and whose input was not archived, which meant they could never be checked for drift; they were removed rather than restated.
+Every number on this page is produced by a committed script that a later release can re-run.
 
 ## Reproducing
 
 The scorers are the same ones that gate changes internally, unmodified — there is no public-only scoring path.
 
 ```bash
-# every axis below in one command, each compared against its committed pin.
-# This is what produced the numbers on this page.
+# every pipeline axis in one command, each compared against its committed pin.
 scripts/live_transcription_benchmark.sh <out-root> --baseline <previous arm> --determinism
-# the scorers convert numbers on both sides; the runner sets this for them:
-#   MIMICSCRIBE_ITN_NUMBERS=1 python3 scripts/score_corpus_wer.py ...
 
-# or one step at a time. First, one decode per arm, 16 AMI meetings + 11
-# Earnings-21 calls
-swift build -c release
-.build/release/mimicscribe --benchmark-pipeline-corpus --corpora ami,earnings21 --files <list>
-
-# or with the RELEASED app and no source at all. MIMICSCRIBE_DATA_DIR (alias:
-# --data-dir <path>) points the whole data directory at a throwaway one, so the
-# run touches no database, keychain item, voice profile, preference or update
-# check of an existing install. Model weights are the one thing it still shares.
-MIMICSCRIBE_DATA_DIR=./sandbox /Applications/MimicScribe.app/Contents/MacOS/mimicscribe \
-  --benchmark-pipeline-corpus --corpora ami,earnings21 --files <list>
-
-# word accuracy, crosstalk split, loss clumping — both call the built binary's
-# --itn-text mode to put reference and rows on one basis, and print which basis
-# they used; --raw is the pre-2026-08-29 counting and does not match the pins
-python3 scripts/score_corpus_wer.py --arms <A> <B> --labels base curr --stratify
-python3 scripts/asr_bench.py       --arms <A> <B> --labels base curr
-
-# punctuation and casing
-python3 scripts/punctuation_accuracy.py --compare <A> <B>
-
-# the live view against the script (replays the recorded sessions live, on a
-# debug build; --repeat 2 replays each session twice to measure replay jitter)
+# live view against the script (12 two-channel sessions replayed at 1x, --repeat 2 checks jitter)
 scripts/live_invariants_gate.sh <out-root> --repeat 2
-# or by hand:
-python3 scripts/score_live_invariants.py --all <replay-root> --json-out chg.json
-python3 scripts/score_live_invariants.py --compare <pinned baseline> chg.json
 
 # numbers in the saved transcript, by value, 11 Earnings-21 calls
 python3 scripts/score_number_fidelity.py --corpus <A>/per-file --json-out chg.json
-python3 scripts/score_number_fidelity.py --corpus-compare <pinned baseline> chg.json
+python3 scripts/score_number_fidelity.py --corpus-compare benchmark/results/number-fidelity/final_transcript_baseline_2026-11-26.json chg.json
 
-# words the recovery layer adds, and the hallucinated rows among them.
-# Needs a run decoded with the per-decision record on (MIMICSCRIBE_SEAM_LEDGER=<dir>)
-python3 scripts/seam_ledger_verdicts.py align   --run <A> --cache-dir <cache>
-python3 scripts/seam_ledger_verdicts.py repairs --ledger <dir> --run <A> --cache-dir <cache> \
-    --split all --json-out repairs.json
-
-# invented phrases over silence: its own token-frame arm (16 AMI meetings, ~10 min),
-# then the scorer, which also checks the pin (exit 1 = a regression, 2 = not comparable)
+# invented phrases over silence (16 AMI meetings, ~10 min)
 scripts/timestamp_merge_ami16_arm.sh <arm>
 python3 scripts/invented_phrase_runs.py --arm <arm> --gate benchmark/results/live-transcription-public/pins.json
 
-# duplicate spans across a row boundary, and how many the shipped rule removes
-python3 scripts/bakeoff/seam_repeat_false_fire.py --cross-row <A> \
-    --bin .build/release/mimicscribe --json-out crossrow.json
-
-# every pin above, checked in one pass; exit 1 = a regression, 2 = not comparable
-python3 scripts/gate_live_transcription_pins.py \
-    --word-accuracy wer.log --word-accuracy-json wer.json \
-    --punctuation punct.log --clumping clump.log \
-    --repairs repairs.json --cross-row crossrow.json --number-fidelity chg.json
+# check every published pin on this page and on the website
+python3 scripts/public_asr_check.py
 ```
 
 Pin the output directory of each arm explicitly. The scorers default to the newest directory on disk, which silently picks up whatever else has been run since.
