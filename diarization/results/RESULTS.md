@@ -1,8 +1,22 @@
 # MimicScribe Diarization Benchmark Results
 
-Pipeline: Parakeet Ultra (spoken-form fine-tune) / Parakeet TDT v3 ASR + Pyannote Community-1 diarization with NVIDIA Nemotron 3 Diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
+Pipeline: Parakeet Ultra (spoken-form fine-tune) ASR + Pyannote Community-1 diarization with NVIDIA Nemotron 3 Diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
 
-Run date: 2026-11-27 (live speaker labels update; post-stop SAA/DER last measured 2026-09-29)
+Run date: 2026-11-28 (post-stop SAA/DER, turn-level & phantom refresh on Parakeet Ultra + Nemotron 3; live speaker labels measured 2026-11-27)
+
+## What's new in the 2026-11-28 update (post-stop diarization, short turns & uncertainty)
+
+**First full post-stop run on shipping Parakeet Ultra + NVIDIA Nemotron 3 Diarization: 57-file aggregate SAA holds at 98.9%, while DER drops from 16.0% to 14.3% across all five corpora.** Every DER component improved relative to the 2026-08-29 breakdown — confusion fell from **1.7% to 1.1%**, false alarm from **7.5% to 6.8%**, and missed speech from **6.8% to 6.4%** — with per-corpus SAA at Earnings-21 **98.3%** (+0.1 pp), VoxConverse **99.1%** (+0.1 pp), AMI **99.1%**, DiPCo **99.0%**, and SCOTUS **99.3%** (−0.1 pp). On the un-tuned **NOTSOFAR-1** 80-meeting far-field eval set, shipping SAA reads **98.6%** (down 0.2 pp from 98.8% on 2026-09-29, with exact speaker counts in **70 of 80** meetings, 9 extra, 1 missing, and **0** segments in Unknown).
+
+**Short-turn and backchannel attribution rose in every bucket.** Comparing against the previously published 2026-08-29 turn-level breakdown on the same 57 files:
+- **Under 2 s, clear of other speech:** `61.0% →` **67.9%** (+6.9 pp)
+- **Under 2 s, spoken over someone:** `12.1% →` **14.6%** (+2.5 pp)
+- **2–10 s turns:** `86.9% →` **88.5%** (+1.6 pp)
+- **Over 10 s turns:** `98.6% →` **98.7%** (`39` of `2,987` turns wrong, **1.3%**, down from `41`; **45 of 57** files have none)
+
+**Smaller hidden "Unknown" bucket, better crowded-call attribution, and explicit uncertainty.** The hidden Unknown bucket shrank from **771** segments (2026-08-29) and **116** segments (2026-09-29) to **72** segments (**0.82%** of segments, **0.04%** of words; 90% one- or two-word backchannels). On crowded calls (such as earnings calls and oral arguments where full-meeting remapping is skipped), a targeted local refinement pass now rechecks contested lines and reassigns them only when voice acoustics and the referee model agree. Lines whose speaker assignment remains genuinely contested are marked with an uncertainty badge in the transcript rather than looking equally certain or being dropped into Unknown.
+
+**Tradeoffs, reported as measured.** Under-split speakers improved from `5` to `3` across the 57 files (absorbed speech `153.1 s → 89.5 s`), and visible speaker counts are exact in **45 of 57** files (`7` extra, `5` missing; SCOTUS `5/5`, DiPCo `4/5`). Uncaught small phantom clusters rose slightly from **9** rows across 7 files to **11** rows across 9 files (all 1–5-segment clusters, with `0` merge regressions and `0` wrong-host merges; Earnings-21 dropped from `1` phantom file to `0`, while AMI rose from `1` to `3` and DiPCo from `0` to `1`).
 
 ## What's new in the 2026-11-27 update (live speaker separation & labeling)
 
@@ -18,25 +32,23 @@ We also add two live measurements that were missing on 2026-10-06: **label accur
 
 **A new corpus: NOTSOFAR-1 evaluation set**, 80 far-field meetings of 3 to 7 speakers (CC BY 4.0, [arXiv 2501.17304](https://arxiv.org/abs/2501.17304)). MimicScribe was not tuned on it. On this room MimicScribe scores **91.7% SAA**, well below the other corpora, because single-channel far-field audio makes it merge speakers.
 
-The turn-level, phantom-speaker, latency and DER-breakdown sections below are from the 2026-08-29 run.
+The latency comparison table below is carried forward from the 2026-07-17 run.
 
 ## Speaker Attribution Accuracy (SAA — saved transcript after Stop)
 
 **SAA = 1 − confusion rate.** Percentage of speech time attributed to the correct speaker.
 
-| Corpus | Files | Pyannote C1 SAA (2026-08-29 run, reference not re-run) | MimicScribe SAA, 2026-08-29 | MimicScribe SAA, 2026-09-29 | With Nemotron 3 Diarization | Speedup |
+| Corpus | Files | Pyannote C1 SAA (2026-08-29 run, reference not re-run) | MimicScribe SAA, 2026-09-29 (no Nemotron) | MimicScribe SAA, 2026-09-29 (Nemotron 3, v3 ASR) | **MimicScribe SAA, 2026-11-28 (shipping Ultra + Nemotron 3)** | Speedup |
 |--------|------:|----------------:|----------------:|----------------:|----------------:|--------:|
-| Earnings-21 | 11 | 98.1% | 98.0% | 98.0% | **98.2%** | 3.7x |
-| VoxConverse | 20 | 95.9% | 97.0% | 97.1% | **99.0%** | 4.1x |
-| SCOTUS | 5 | 99.2% | 99.4% | 99.4% | **99.4%** | 5.4x |
-| AMI | 16 | 97.0% | 98.1% | 98.2% | **99.1%** | 3.7x |
-| DiPCo | 5 | — | 97.6% | 97.9% | **99.0%** | — |
-| **Aggregate** | **57** | — | **98.3%** | **98.4%** | **98.9%** | — |
-| NOTSOFAR-1 eval (not tuned on) | 80 | not run | — | 91.7% | **98.8%** | — |
+| Earnings-21 | 11 | 98.1% | 98.0% | 98.2% | **98.3%** | 3.7x |
+| VoxConverse | 20 | 95.9% | 97.1% | 99.0% | **99.1%** | 4.1x |
+| SCOTUS | 5 | 99.2% | 99.4% | 99.4% | **99.3%** | 5.4x |
+| AMI | 16 | 97.0% | 98.2% | 99.1% | **99.1%** | 3.7x |
+| DiPCo | 5 | — | 97.9% | 99.0% | **99.0%** | — |
+| **Aggregate** | **57** | — | **98.4%** | **98.9%** | **98.9%** | — |
+| NOTSOFAR-1 eval (not tuned on) | 80 | not run | 91.7% | 98.8% | **98.6%** | — |
 
-The "With Nemotron 3 Diarization" column is the shipping build (CPU inference). The 2026-09-29 column is the same main without Nemotron.
-
-On the 52-file basis used before DiPCo was added, the aggregate is **98.3%** (2026-08-29 run; the 2026-09-29 52-file figure is not recomputed here). Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU). **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters; the reference has not yet been run on DiPCo or NOTSOFAR-1. Speedup is from the 2026-08-29 run.
+The **2026-11-28** column is the shipping build (`aa3e7f09a`, `v1.0.0-rc.49`: Parakeet Ultra spoken-form ASR + Pyannote Community-1 + NVIDIA Nemotron 3 Diarization on CPU). On the 52-file basis used before DiPCo was added, the 2026-11-28 aggregate is also **98.9%** (up from 98.3% on 2026-08-29). Speedup is diarization-only on Apple M1 Max (ANE vs MPS GPU), carried forward from 2026-07-17. **Pyannote C1** is the reference [community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) pipeline run in Python with default parameters; the reference has not yet been run on DiPCo or NOTSOFAR-1.
 
 Over-segmentation is preferred over under-segmentation. Merging two speakers in the UI is a single correction; splitting one speaker requires manual per-segment reassignment.
 
@@ -107,35 +119,39 @@ The `~1.4 s` gap between audio-clock (`8.0 s`) and real `1×` (`9.4 s`) reflects
 
 ## Turn-level accuracy
 
-SAA weights speech by time, so long turns dominate it. The questions a reader actually has are sharper: **is a substantial contribution ever credited to the wrong person**, and what happens on quick exchanges? Turn-level scoring on the same run answers both (definitions under Methodology).
+_Measured **2026-11-28** on release build `aa3e7f09a` (57-file canonical corpus, shipping Parakeet Ultra + Nemotron 3)._
 
-**Substantial turns.** Of the 2,987 turns of ten seconds or longer across the corpus, 41 (**1.4%**) end up under the wrong speaker's label. 43 of the 57 files have none. At five seconds or longer it is 3.2%. The misattributed turns concentrate in the hardest rooms: the two crowded, overlap-heavy meeting series (AMI's EN2002 four-way discussions and DiPCo's dinner parties) account for more than half of the 41.
+SAA weights speech by time, so long turns dominate it. Turn-level scoring on the same run measures two sharper questions: how often a substantial contribution lands under the wrong person, and what happens on quick exchanges (definitions under Methodology).
 
-**Quick exchanges.** Attribution falls off with turn length:
+**Substantial turns.** Of the 2,987 covered turns of ten seconds or longer across the corpus, 39 (**1.3%**) end up under the wrong speaker's label (down from 41 / 1.4% on 2026-08-29). **45 of the 57 files have none** (up from 43). At five seconds or longer it is **2.9%** (174 of 5,943, down from 3.2%). The remaining misattributed turns concentrate in the hardest rooms: AMI's EN2002 four-way discussions, DiPCo's dinner parties, and crowded earnings calls.
 
-| Reference turn | Turns | Attributed to the correct speaker |
-|----------------|------:|----------------------------------:|
-| Over 10s | 2,983 | 98.6% |
-| 2–10s | 6,601 | 86.9% |
-| Under 2s, clear of other speech | 3,387 | 61.0% |
-| Under 2s, spoken over someone | 4,646 | 12.1% |
+**Quick exchanges.** Attribution falls off with turn length, but every bucket improved over the 2026-08-29 run:
 
-The remainder of each row splits between wrong-speaker and not-transcribed; short turns are both the hardest to attribute and the most likely to be dropped by the ASR. The last row is mostly a representation limit rather than an attribution error: the transcript is a single stream, so a backchannel spoken over someone else is usually absorbed into the dominant speaker's line or not transcribed at all. This is the granularity frontier: the numbers this benchmark should be judged on improving.
+| Reference turn | Turns | 2026-08-29 | **2026-11-28 (Ultra + Nemotron 3)** |
+|----------------|------:|-----------:|------------------------------------:|
+| Over 10s | 2,983 | 98.6% | **98.7%** |
+| 2–10s | 6,601 | 86.9% | **88.5%** |
+| Under 2s, clear of other speech | 3,387 | 61.0% | **67.9%** |
+| Under 2s, spoken over someone | 4,646 | 12.1% | **14.6%** |
+
+Percentages report accuracy over covered reference turns (at least 20% of the turn transcribed); the remainder of each bucket is misattributed turns, with untranscribed turns tracked separately (e.g. 179 of 3,387 clear under-2s turns were not transcribed). The last row remains largely a single-stream representation limit: a backchannel spoken over someone else is often absorbed into the dominant speaker's line.
 
 ## Phantom-speaker accounting
 
-SAA measures how much speech time lands on the wrong speaker — it barely moves when the pipeline invents a small extra speaker. So this benchmark also counts **phantom speakers** directly: clusters in the output whose speech belongs to a participant already represented by another cluster. On this run, 50 of the 57 files have no phantom speaker. Of the seven that do, five have one and two have two.
+_Measured **2026-11-28** on release build `aa3e7f09a`._
 
-| Corpus | Files | Files with a phantom speaker |
-|--------|------:|-----------------------------:|
-| Earnings-21 | 11 | 1 |
-| VoxConverse | 20 | 5 |
-| SCOTUS | 5 | 0 |
-| AMI | 16 | 1 |
-| DiPCo | 5 | 0 |
-| **Total** | **57** | **7** |
+SAA measures how much speech time lands on the wrong speaker — it barely moves when the pipeline invents a small extra speaker. So this benchmark also counts **phantom speakers** directly: clusters in the output whose speech belongs to a participant already represented by another cluster. On the 2026-11-28 run, 48 of the 57 files have no phantom speaker (vs. 50 of 57 on 2026-08-29). Of the nine files that do, seven have one and two have two — 11 phantom clusters in total, all 1 to 5 segments long, with 0 merge regressions.
 
-Counting visible speakers directly (the hidden Unknown bucket excluded): the speaker list is exactly right in 43 of 57 files, shows one extra speaker in 5, and is missing one speaker in 9. The missing-speaker files are the under-segmentation the over-segmentation preference cannot reach — typically a quiet participant absorbed into an acoustically similar neighbor.
+| Corpus | Files | Files with a phantom speaker (2026-08-29) | **Files with a phantom speaker (2026-11-28)** |
+|--------|------:|------------------------------------------:|----------------------------------------------:|
+| Earnings-21 | 11 | 1 | **0** |
+| VoxConverse | 20 | 5 | **5** |
+| SCOTUS | 5 | 0 | **0** |
+| AMI | 16 | 1 | **3** |
+| DiPCo | 5 | 0 | **1** |
+| **Total** | **57** | **7** | **9** |
+
+Counting visible speakers directly (the hidden Unknown bucket excluded): the speaker list is exactly right in **45 of 57** files (up from 43 on 2026-08-29; SCOTUS 5/5, DiPCo 4/5, AMI 13/16, Earnings-21 8/11, VoxConverse 15/20), shows extra speakers in **7** files (five with +1, two with +2), and misses a speaker in **5** files (four with −1, one with −2; down from 9 missing on 2026-08-29 and 6 missing on 2026-09-29). The hidden Unknown bucket holds **72** of 8,772 segments (**0.82%**, 115 words / **0.04%** of words), down from 771 segments on 2026-08-29 and 116 on 2026-09-29.
 
 ## What the LLM step does
 
@@ -160,24 +176,27 @@ Diarization-only, Apple M1 Max. Pyannote uses MPS (GPU); MimicScribe uses ANE. T
 
 ## DER Breakdown
 
+_Measured **2026-11-28** on release build `aa3e7f09a` (shipping Parakeet Ultra + Nemotron 3)._
+
 The DER number on this benchmark mixes three components, only one of which measures attribution quality:
 
 - **Confusion** — was the right speaker tagged on speech the system actually transcribed?
 - **Missed speech** — speech the system didn't emit at all. Driven by ASR coverage, not diarization.
 - **False alarm** — hyp-tagged speech that ref marks as silence. Driven by UX choices about how segments are drawn.
 
-**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 1.9% → **1.7%** (1.8% to 1.7% on the 52-file basis). Per corpus: Earnings-21 2.1% to 2.0%, AMI 2.1% to 1.9%, VoxConverse 3.1% to 3.0%, SCOTUS 0.8% to 0.6%, DiPCo 2.6% to 2.4%. Aggregate DER is flat at 16.0%: the confusion gain is offset by missed speech rising from 6.6% to 6.8% — ASR coverage, not attribution — with false alarm unchanged at 7.5%.
+**Aggregate DER fell from 16.0% to 14.3% (−1.7 pp), and every component improved.** Confusion dropped from 1.7% to **1.1%**, false alarm from 7.5% to **6.8%**, and missed speech from 6.8% to **6.4%**. DER fell on all five corpora: Earnings-21 15.6% → 14.2%, VoxConverse 14.8% → 12.4%, SCOTUS 1.5% → 1.4%, AMI 26.1% → 23.4%, and DiPCo 29.5% → 26.7%. On NOTSOFAR-1 (80 far-field meetings), DER is **25.3%** (1.4% confusion, 1.3% false alarm, 22.6% missed speech).
 
 The pipeline collapses consecutive same-speaker word runs into one segment even across mid-thought pauses — a 4-second pause shouldn't split one person's quote into two transcript lines — and every merged-over pause costs false-alarm frames in this scoring. Note the anti-gaming asymmetry: a system that drops mumbled or overlapped speech shows *less* confusion than one that captures it, because missed speech can't be misattributed.
 
 | Corpus | DER | Confusion | False Alarm | Missed |
 |--------|----:|----------:|------------:|-------:|
-| Earnings-21 | 15.6% | 2.0% | 13.5% | 0.1% |
-| VoxConverse | 14.8% | 3.0% | 7.6% | 4.2% |
-| SCOTUS | 1.5% | 0.6% | 0.0% | 0.9% |
-| AMI | 26.1% | 1.9% | 10.0% | 14.1% |
-| DiPCo | 29.5% | 2.4% | 2.6% | 24.5% |
-| **Aggregate** | **16.0%** | **1.7%** | **7.5%** | **6.8%** |
+| Earnings-21 | 14.2% | 1.7% | 12.4% | 0.1% |
+| VoxConverse | 12.4% | 0.9% | 7.5% | 4.1% |
+| SCOTUS | 1.4% | 0.7% | 0.0% | 0.7% |
+| AMI | 23.4% | 0.9% | 9.0% | 13.5% |
+| DiPCo | 26.7% | 1.0% | 2.3% | 23.4% |
+| **Aggregate (57 files)** | **14.3%** | **1.1%** | **6.8%** | **6.4%** |
+| NOTSOFAR-1 eval (80 files) | 25.3% | 1.4% | 1.3% | 22.6% |
 
 ## Benchmark vs Production
 
@@ -202,21 +221,25 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 
 - **Collar**: 0.25s — a quarter-second on each side of every reference boundary is excluded from scoring (standard practice; boundary placement inside the collar is not measured)
 - **Scoring**: [pyannote.metrics](https://pyannote.github.io/pyannote-metrics/) DiarizationErrorRate, `skip_overlap=False` — overlapping speech is scored, not excluded
-- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 1.0s (turns of 2s or more are scored); a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
+- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 0.5 s in the turn-level breakdown (and ≤ 1.0 s in the turn-outcome ratchet); a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
 - **Live speaker metrics (2026-11-27)**: deterministic audio-clock replays use `--replay-live-labels` (first 10 min of AMI, full NOTSOFAR-1); real-time replays use `--replay-live-meeting` at `1×` serially on Apple M1 Max. Both run with default parameters and cold start (no voice profiles).
 - **Diarization**: Pyannote Community-1 via [FluidAudio](https://github.com/FluidInference/FluidAudio) CoreML, with NVIDIA Nemotron 3 Diarization (FluidAudio CoreML, CPU)
-- **ASR**: Post-stop 2026-09-29 runs used Parakeet TDT 0.6B v3; 2026-11-27 live speaker runs use the shipped Parakeet Ultra spoken-form fine-tune via FluidAudio CoreML.
+- **ASR**: 2026-11-28 post-stop runs and 2026-11-27 live speaker runs use the shipped **Parakeet Ultra** spoken-form fine-tune via FluidAudio CoreML (`--no-asr-cache` on the 2026-11-28 post-stop sweep); earlier 2026-09-29 and 2026-08-29 runs used Parakeet TDT 0.6B v3.
 - **LLM**: Gemini 3.1 Flash Lite (temp 0.1, thinking minimal)
 
 ## Reproducibility
 
-The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). Post-stop 2026-09-29 runs were produced at `parakeet-transcriber` commits `db5059662` (without Nemotron) and `9677ee3be` (with Nemotron 3). The 2026-11-27 live speaker measurements were produced at commit `541309fd0` with default parameters.
+The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). Post-stop **2026-11-28** runs were produced at `parakeet-transcriber` commit `aa3e7f09a` (`v1.0.0-rc.49`) with default parameters and `--no-asr-cache` (`benchmark/results/diarization/diar_2026-11-28.json` and `diar_2026-11-28_notsofar80.json`). Earlier post-stop 2026-09-29 runs were produced at commits `db5059662` (without Nemotron) and `9677ee3be` (with Nemotron 3); 2026-11-27 live speaker measurements were produced at commit `541309fd0`.
 
 ```bash
-# Post-stop deterministic diarization (57-file corpus)
-swift build -c release
-.build/release/mimicscribe --benchmark-pipeline-corpus
-PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 -m mimicscribe_bench.runner
+# Post-stop deterministic diarization (57-file canonical corpus, fresh Ultra ASR)
+swift build -c release --product mimicscribe --build-system native
+.build/release/mimicscribe --benchmark-pipeline-corpus --corpora ami,dipco,earnings21,scotus,voxconverse --files <57-file-list> --no-asr-cache
+PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 -m mimicscribe_bench.runner --input-dir <out-dir> --label diar_2026-11-28
+
+# NOTSOFAR-1 eval set (80 far-field meetings)
+.build/release/mimicscribe --benchmark-pipeline-corpus --corpora notsofar --no-asr-cache
+PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 -m mimicscribe_bench.runner --input-dir <out-dir> --corpora notsofar --label diar_2026-11-28_notsofar80
 
 # Live speaker separation & labeling (single meeting example, default parameters)
 .build/release/mimicscribe --replay-live-labels --raw-mic <silent.wav> --system <meeting.wav> --out-dir <out> --max-seconds 600
@@ -243,5 +266,6 @@ Every published run of this benchmark, oldest to newest. The full text of each v
 | 2026-08-29 | 57 | 98.3% | Word timings no longer overrun the audio that produced them: confusion 1.9% → 1.7% with missed speech 6.6% → 6.8%; substantial-turn misattribution 44 → 41 of 2,987; phantom rows 10 → 9 |
 | 2026-09-29 | 57 | **98.4%** | Current main: DER fell on four of five corpora (AMI 26.1% → 24.9%); NOTSOFAR-1 (80 meetings) added at 91.7%, not tuned on. With NVIDIA Nemotron 3 Diarization: **98.9%**, NOTSOFAR-1 98.8% |
 | 2026-11-27 | 10 live | **97.3% live** | Live speaker separation & labeling update (`541309fd0`): cold-start 4-file overlap live SAA `94.7% → 96.5%`; 10-meeting cold-start `97.3%` live SAA (`9/10` exact speaker counts, `80.9%` right at `+10 s`); added quiet `1×` real-time turn-separation latency (`9.4 s` median after change, `6.0 s` after words appear) |
+| 2026-11-28 | 57 + 80 | **98.9%** | Shipping Parakeet Ultra + Nemotron 3 post-stop refresh (`aa3e7f09a`): 57-file aggregate SAA holds at **98.9%** (Earnings-21 98.3%, VoxConverse 99.1%, SCOTUS 99.3%, AMI 99.1%, DiPCo 99.0%; NOTSOFAR-1 98.6%); aggregate DER `16.0% → 14.3%` (every component improved); under-2s clear turns `61.0% → 67.9%`, overlapped `12.1% → 14.6%`; hidden Unknown bucket `116 → 72` segments; crowded-call local refinement and explicit uncertainty marking; small phantom rows `9 → 11` (0 merge regressions) |
 
-Aggregates are comparable only within the same file basis: 58 → 52 removed the Podcast corpus (May 2026); 52 → 57 added DiPCo (July 2026). On the shared 52-file basis, the 2026-07-17 and 2026-08-25 runs both score 98.2% and the 2026-08-29 run scores 98.3%.
+Aggregates are comparable only within the same file basis: 58 → 52 removed the Podcast corpus (May 2026); 52 → 57 added DiPCo (July 2026). On the shared 52-file basis, the 2026-07-17 and 2026-08-25 runs both score 98.2%, 2026-08-29 scores 98.3%, and 2026-11-28 scores **98.9%**.
