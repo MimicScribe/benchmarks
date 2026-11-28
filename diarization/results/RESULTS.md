@@ -1,10 +1,16 @@
 # MimicScribe Diarization Benchmark Results
 
-Pipeline: Parakeet TDT v3 ASR + Pyannote Community-1 diarization with NVIDIA Nemotron 3 Diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
+Pipeline: Parakeet Ultra (spoken-form fine-tune) / Parakeet TDT v3 ASR + Pyannote Community-1 diarization with NVIDIA Nemotron 3 Diarization + on-device post-clustering refinement + Gemini 3.1 Flash Lite for naming.
 
-Run date: 2026-09-29 (previous run: 2026-08-29)
+Run date: 2026-11-27 (live speaker labels update; post-stop SAA/DER last measured 2026-09-29)
 
-## What's new in the 2026-09-29 update
+## What's new in the 2026-11-27 update (live speaker separation & labeling)
+
+**Live speaker attribution on cold-start meetings rose from 94.7% to 96.5% SAA (+1.8 pp)** on the four unprofiled meetings shared with the 2026-10-06 measurement (`EN2002a`, `MTG_32003`, `MTG_32005`, `MTG_32008`), with speech carrying a speaker label up from `73.1%` to `75.5%` and last-screen accuracy up from `95.0%` to `96.9%`. Across an expanded **10-meeting cold-start suite** (6 AMI meetings + 4 far-field NOTSOFAR-1 meetings, 1.7 hours, no saved voice profiles), MimicScribe scores **97.3% live SAA during the call** (**98.4%** on AMI, **95.0%** on far-field NOTSOFAR-1), matches the **exact speaker count in 9 of 10 meetings** (0 missing speakers, 1 meeting with one extra speaker), and reaches **80.9% right labels within 10 seconds** of a line ending (**85.2%** on AMI).
+
+We also add two live measurements that were missing on 2026-10-06: **label accuracy and stability over time** (`+5 s` to `+30 s`, provisional flips, and confirmed-label accuracy) and **quiet `1×` real-time turn-separation latency** on public recordings so Neural Engine and queue time are measured directly rather than hidden behind an audio clock.
+
+## What's new in the 2026-09-29 update (post-stop diarization)
 
 **With NVIDIA Nemotron 3 Diarization: 57-file aggregate SAA 98.4% → 98.9%, NOTSOFAR-1 91.7% → 98.8%.** The shipping build runs Nemotron 3 alongside MimicScribe's own diarizer and lets it correct lines and speakers MimicScribe was unsure about, while MimicScribe keeps its speakers and names. Per corpus: AMI 99.1%, DiPCo 99.0%, VoxConverse 99.0%, Earnings-21 98.2%, SCOTUS 99.4%. All four diarization gates passed on the 57 files (phantom rows 9 → 9, no merge regressions; the hidden "Unknown" bucket shrank from 771 to 116 segments). The speaker list is exactly right in 45 of 57 files, up from 42 without Nemotron (one or more extra speakers in 6, one or more missing in 6); the three gained files are VoxConverse. On NOTSOFAR-1 it is exactly right in 73 of 80 meetings.
 
@@ -14,17 +20,7 @@ Run date: 2026-09-29 (previous run: 2026-08-29)
 
 The turn-level, phantom-speaker, latency and DER-breakdown sections below are from the 2026-08-29 run.
 
-## Previous update: 2026-08-29
-
-### What changed on 2026-08-29
-
-**Aggregate SAA 98.1% → 98.3%** on the same 57 files (98.2% → 98.3% on the 52-file basis). Confusion — the component of the error that measures attribution — fell from 1.9% to 1.7% of reference time, and fell on every corpus: AMI 2.1% to 1.9%, DiPCo 2.6% to 2.4%, Earnings-21 2.1% to 2.0%, SCOTUS 0.8% to 0.6%, VoxConverse 3.1% to 3.0%.
-
-Missed speech moved the other way, slightly: 6.6% to 6.8% of reference time (AMI 13.8% to 14.1%, DiPCo 24.1% to 24.5%, VoxConverse 4.0% to 4.2%, SCOTUS 0.7% to 0.9%, Earnings-21 unchanged at 0.1%). Both movements come from one change in the ASR layer: a word's timing can no longer extend past the audio that produced it. Segments end where speech ends, which trims a sliver of coverage at the tail of utterances and puts turn boundaries a little closer to where the speaker actually changed. Reported as measured, in both directions.
-
-Substantial turns improved: 41 of the 2,987 reference turns of ten seconds or longer land under the wrong speaker, against 44 in the previous run, and 43 of the 57 files still have none. Short turns held or edged up: under two seconds and clear of other speech 60.4% to 61.0%, two to ten seconds 86.8% to 86.9%, spoken over someone 11.8% to 12.1%. Phantom speakers fell from 10 to 9 across the same 7 files, and the visible speaker list is exactly right in 43 of 57 files (was 42).
-
-## Speaker Attribution Accuracy (SAA)
+## Speaker Attribution Accuracy (SAA — saved transcript after Stop)
 
 **SAA = 1 − confusion rate.** Percentage of speech time attributed to the correct speaker.
 
@@ -44,48 +40,70 @@ On the 52-file basis used before DiPCo was added, the aggregate is **98.3%** (20
 
 Over-segmentation is preferred over under-segmentation. Merging two speakers in the UI is a single correction; splitting one speaker requires manual per-segment reassignment.
 
-## Live speaker labels (during the call)
+## Live speaker labels & separation (during the call)
 
-_Measured 2026-10-06 on build `2ed6b4964`._
+_Measured **2026-11-27** on release build `541309fd0` (shipped Parakeet Ultra spoken-form model + live Pyannote/WeSpeaker/Nemotron stack). The saved-profile row below is carried forward from the 2026-10-06 build (`2ed6b4964`) and dated separately._
 
-The table above scores the finished transcript. This section scores what you see while the meeting is still going: the speaker label on each line of the live transcript, as it stood on screen at that moment.
+The table above scores the finished transcript after Stop. This section scores what appears on screen **while the meeting is still running**: how accurately lines are grouped, how quickly a new speaker separates onto their own row, how fast the right label arrives, and how steady confirmed labels stay. All audio processing runs on-device on Apple Silicon.
 
-**During the call, speaker attribution accuracy was 97.3%**, on the same measure as the SAA table above, against the same human reference timelines. Counted only over the speech that already carried a speaker label, **96.6% of it was under the right speaker.**
+### Live speaker attribution accuracy (cold start, no voice profiles)
 
-| Files | Voice profiles | Hours | SAA during the call | Of labeled speech, right speaker | SAA, last screen before stop | Speech under a label, during the call |
-|-------|----------------|------:|------:|------:|------:|------:|
-| AMI ES2004c/d, IS1009c/d, TS3003c/d | saved from earlier meetings in the series | 2.02 | 98.3% | 98.1% | 98.4% | 87.8% |
-| AMI EN2002a, NOTSOFAR-1 MTG_32003/05/08 | none | 0.70 | 94.7% | 92.8% | 95.0% | 73.1% |
-| **All 10** | | **2.72** | **97.3%** | **96.6%** | **97.4%** | **83.6%** |
+Ten public meetings replayed as remote call audio with no prior voice profiles (first 10 minutes of 6 AMI meetings + 4 full NOTSOFAR-1 far-field meetings, 1.7 hours total):
 
-How it is measured:
+| Subset | Voice profiles | Hours | SAA during the call | Of labeled speech, right speaker | SAA, last screen before Stop | Speech under a label, during the call | Exact speaker count |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **AMI (6 meetings)** (`EN2002a/b`, `EN2006b`, `ES2004c`, `IS1009c`, `TS3005a`) | none | 1.02 | **98.4%** | **97.7%** | **98.5%** | 78.0% | **5 / 6** |
+| **NOTSOFAR-1 far-field (4 meetings)** (`MTG_32000/03/05/08`) | none | 0.68 | **95.0%** | **93.1%** | **95.4%** | 75.9% | **4 / 4** |
+| **All 10 cold-start meetings (2026-11-27)** | **none** | **1.70** | **97.3%** | **96.2%** | **97.5%** | **77.3%** | **9 / 10** |
+| *4-file overlap vs. 2026-10-06 (`EN2002a`, `MTG_32003/05/08`)* | *none* | *0.68* | *94.7% → **96.5%*** | *92.8% → **95.1%*** | *95.0% → **96.9%*** | *73.1% → **75.5%*** | *4 / 4* |
+| *Prior profiled-team suite (2026-10-06, `2ed6b4964`, AMI `ES2004c/d`, `IS1009c/d`, `TS3003c/d`)* | *saved from earlier meetings* | *2.02* | *98.3%* | *98.1%* | *98.4%* | *87.8%* | *—* |
 
-- Each recording is replayed through the live pipeline at twice real speed, played in as the call's remote audio, as if every participant were on the other end of a video call. AMI files run their first 20 minutes; the three NOTSOFAR-1 meetings are about 7 minutes each.
-- **Voice profiles.** Six AMI files ran with saved profiles of their participants, enrolled from earlier meetings in the same series (never from the meeting being scored), the way a returning team would use the app. The other four had none. The table reports the two groups separately; with no profiles, attribution is about 3.6 points lower.
-- **During the call.** The screen is scored at every 30 seconds of meeting time, each time against only the speech heard so far. Errors and speech are summed over those snapshots, so a snapshot counts in proportion to the speech it covers. Each file counts in proportion to its own speech in every column.
-- **What SAA leaves out.** As in the finished-transcript SAA, speech without a speaker label is not counted as wrong. During the call that is 16.4% of reference speech: 4.8% sits on lines still showing the neutral "Remote" label, and the rest is speech not on screen yet or not transcribed. The "of labeled speech" column divides by labeled speech only. Counting the "Remote" lines as wrong, attribution reads 92.5% during the call and 95.9% at the last screen. Lines can stay "Remote" for some time before they are identified; by the last screen 1.5% of speech is still unlabeled.
-- **Label changes are not penalized.** The best match between on-screen labels and real speakers is worked out at each snapshot, so a line that moves from one label to another between snapshots is scored on where it sits at that moment. This measures how well speech is grouped by speaker at each point in the call, not how stable the labels are.
-- **The last column is the live screen.** "Last screen before stop" is the live transcript at the end of the replayed excerpt, not the finished transcript scored above, and the AMI excerpts are the first 20 minutes, not whole meetings.
+Across the 10 cold-start meetings, the live visible speaker count matches the ground-truth count (speakers with ≥ 5 s of speech) in **9 of 10 meetings** — 1 meeting (`EN2002b`) shows one extra speaker and **0 meetings** miss a real speaker.
 
-What this does not cover:
+### Label accuracy over time and label stability
 
-- Ten files is a small basis next to the 57 above, and it is one run. Two earlier runs of the same files, on the two builds before this one, read 97.1% and 95.3% during the call.
-- NOTSOFAR-1's far-field rooms are the weak spot: 90–94% per file during the call, against 96.7–99.6% on AMI.
-- The local microphone channel is not scored here. These recordings have one channel, so everything plays as remote audio.
-- Whether the name shown on a line is the right person is a separate measurement and not part of these numbers.
+Rather than only scoring end-of-meeting grouping, we check the speaker label shown on screen **`+5 s`, `+10 s`, `+15 s`, and `+30 s`** after each line ends (fair speaker-group mapping against human RTTM timelines), paired with stability checks so showing labels faster cannot be gamed by flickering or guessing prematurely:
 
-| File | Corpus | Voice profiles | SAA during the call | Of labeled speech | SAA, last screen |
-|------|--------|---|---------:|---------:|---------:|
-| ES2004c | AMI | yes | 98.9% | 98.7% | 99.2% |
-| ES2004d | AMI | yes | 97.8% | 97.3% | 98.4% |
-| IS1009c | AMI | yes | 98.9% | 98.7% | 98.7% |
-| IS1009d | AMI | yes | 97.8% | 97.5% | 97.7% |
-| TS3003c | AMI | yes | 99.6% | 99.6% | 99.3% |
-| TS3003d | AMI | yes | 97.0% | 96.6% | 96.7% |
-| EN2002a | AMI | no | 96.7% | 95.5% | 96.1% |
-| MTG_32003 | NOTSOFAR-1 | no | 93.5% | 90.0% | 94.9% |
-| MTG_32005 | NOTSOFAR-1 | no | 90.2% | 88.1% | 91.1% |
-| MTG_32008 | NOTSOFAR-1 | no | 94.0% | 91.0% | 95.6% |
+| Replay basis | `+5 s` right / unlabeled / wrong | `+10 s` right / unlabeled / wrong | `+15 s` right / unlabeled / wrong | `+30 s` right / unlabeled / wrong | Provisional labels switching speaker | Confirmed labels that later changed | Confirmed-label accuracy | Median time to confirmed label |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **AMI (6 meetings, deterministic audio clock)** | **70.0%** / 29.0% / 1.0% | **85.2%** / 12.6% / 2.2% | **90.2%** / 6.7% / 3.1% | **91.3%** / 5.6% / 3.1% | **0.10%** | 4.6% | **95.8%** | 8.8 s |
+| **NOTSOFAR-1 (4 far-field meetings, audio clock)** | 46.9% / 48.3% / 4.8% | 74.2% / 22.4% / 3.5% | 84.4% / 11.1% / 4.5% | 87.9% / 8.5% / 3.5% | 2.96% | 10.3% | 92.5% | 8.8 s |
+| **All 10 cold-start meetings (audio clock)** | **61.0%** / 36.5% / 2.5% | **80.9%** / 16.4% / 2.7% | **87.9%** / 8.4% / 3.6% | **90.0%** / 6.7% / 3.3% | **1.22%** | 6.8% | **94.5%** | 8.8 s |
+| **Real-time `1×` playback (4 public meetings, M1 Max)** | **60.8%** / 37.5% / 1.7% | **83.7%** / 14.2% / 2.1% | **89.4%** / 7.2% / 3.4% | **91.2%** / 4.9% / 3.8% | **0.16%** *(0.00% AMI)* | 8.8% | **94.7%** | 8.8 s |
+
+### Turn-separation speed (how fast a speaker switch splits onto a new row)
+
+A deterministic audio-clock replay pauses for model work at every step, so it measures decisions without Neural Engine or queue delay. To measure what a reader actually experiences, we run **quiet serial `1×` real-time replays** on Apple M1 Max alongside the 10-meeting deterministic suite, using strict separation (a new turn counts as separated only when its primary row shares no overlap with the previous speaker's turn) plus **word-level wrong-row share** (which catches both late splits and splits placed at the wrong sentence):
+
+| Replay basis | Speaker changes scored | Unseparated turns | Median time to split after speaker change | Median time to split after words appear | All-changes censored median | Words on wrong speaker's row (`+5 s` → `+12 s` → Stop) |
+|---|---:|---:|---:|---:|---:|---:|
+| **Real-time `1×` playback** (4 public meetings: `EN2002a`, `EN2006b`, `ES2004c`, `MTG_32005`, 21 min) | 60 | 11 | **9.4 s** *(p90 18.0 s)* | **6.0 s** *(p90 15.4 s)* | **10.8 s** | **16.8% → 10.4% → 7.7%** |
+| **Deterministic audio clock** (10 public meetings, 1.7 h; excludes model queue time) | 344 | 76 | 8.0 s *(p90 13.9 s)* | 5.0 s *(p90 11.0 s)* | 8.8 s | 15.7% → 10.3% → 7.9% |
+
+The `~1.4 s` gap between audio-clock (`8.0 s`) and real `1×` (`9.4 s`) reflects actual on-device model inference and queue latency during live recording.
+
+### Per-file live breakdown (2026-11-27, cold start, no voice profiles)
+
+| File | Corpus | SAA during the call | Of labeled speech | SAA, last screen | Visible / true speakers |
+|---|---|---:|---:|---:|---:|
+| EN2002a | AMI | 98.4% | 97.9% | 98.9% | 4 / 4 |
+| EN2002b | AMI | 98.9% | 98.1% | 98.5% | 5 / 4 |
+| EN2006b | AMI | 94.7% | 91.7% | 95.7% | 4 / 4 |
+| ES2004c | AMI | 99.3% | 99.2% | 99.2% | 4 / 4 |
+| IS1009c | AMI | 99.5% | 99.5% | 99.5% | 2 / 2 |
+| TS3005a | AMI | 99.0% | 99.0% | 98.8% | 4 / 4 |
+| MTG_32000 | NOTSOFAR-1 | 93.8% | 91.6% | 93.9% | 4 / 4 |
+| MTG_32003 | NOTSOFAR-1 | 97.4% | 96.8% | 97.6% | 4 / 4 |
+| MTG_32005 | NOTSOFAR-1 | 96.2% | 95.6% | 95.9% | 4 / 4 |
+| MTG_32008 | NOTSOFAR-1 | 92.9% | 89.0% | 94.4% | 4 / 4 |
+
+### How live speaker labels are measured — and honest caveats
+
+- **Hardest channel condition (single-channel remote audio):** Every participant in these public recordings plays through the remote/system channel while the microphone channel is silent. In real video calls, your own microphone is captured on its own isolated channel, so local-vs-remote separation is immediate.
+- **Cold start vs. returning teams:** All 2026-11-27 rows above run with zero saved voice profiles — every speaker is discovered from scratch during the call. Returning teams with enrolled voice profiles generally reach higher coverage earlier (see the dated 2026-10-06 profiled-team row).
+- **Far-field rooms stay harder:** NOTSOFAR-1 single-channel far-field audio trails AMI close-talk audio (`95.0%` vs `98.4%` live SAA; `74.2%` vs `85.2%` right at `+10 s`), and accounts for most provisional speaker switches (`2.96%` vs `0.10%` on AMI).
+- **Audio clock vs. `1×` real time:** Deterministic audio-clock replays are repeatable across builds and best for accuracy and regression gating; real-time `1×` replays are slower by real Neural Engine + queue time (~1–1.5 s) and vary slightly across runs. Both are reported beside each other rather than quoting the faster audio-clock figure alone.
+- **What SAA leaves out:** As in post-stop SAA, speech without a speaker label yet is not counted as wrong. Counting unlabeled "Remote" lines as wrong reads `93.3%` during the call and `95.5%` at the last screen across the 10 meetings (`90.7%` / `94.2%` on `1×`).
 
 ## Turn-level accuracy
 
@@ -148,7 +166,7 @@ The DER number on this benchmark mixes three components, only one of which measu
 - **Missed speech** — speech the system didn't emit at all. Driven by ASR coverage, not diarization.
 - **False alarm** — hyp-tagged speech that ref marks as silence. Driven by UX choices about how segments are drawn.
 
-**Confusion is the meaningful component, and it fell from 1.9% to 1.7% aggregate** (1.8% to 1.7% on the 52-file basis). Per corpus: Earnings-21 2.1% to 2.0%, AMI 2.1% to 1.9%, VoxConverse 3.1% to 3.0%, SCOTUS 0.8% to 0.6%, DiPCo 2.6% to 2.4%. Aggregate DER is flat at 16.0%: the confusion gain is offset by missed speech rising from 6.6% to 6.8% — ASR coverage, not attribution — with false alarm unchanged at 7.5%.
+**Confusion is the meaningful component, and it dropped on every corpus.** Aggregate: 1.9% → **1.7%** (1.8% to 1.7% on the 52-file basis). Per corpus: Earnings-21 2.1% to 2.0%, AMI 2.1% to 1.9%, VoxConverse 3.1% to 3.0%, SCOTUS 0.8% to 0.6%, DiPCo 2.6% to 2.4%. Aggregate DER is flat at 16.0%: the confusion gain is offset by missed speech rising from 6.6% to 6.8% — ASR coverage, not attribution — with false alarm unchanged at 7.5%.
 
 The pipeline collapses consecutive same-speaker word runs into one segment even across mid-thought pauses — a 4-second pause shouldn't split one person's quote into two transcript lines — and every merged-over pause costs false-alarm frames in this scoring. Note the anti-gaming asymmetry: a system that drops mumbled or overlapped speech shows *less* confusion than one that captures it, because missed speech can't be misattributed.
 
@@ -184,22 +202,29 @@ These results are a **worst-case scenario** using single-channel mixed audio wit
 
 - **Collar**: 0.25s — a quarter-second on each side of every reference boundary is excluded from scoring (standard practice; boundary placement inside the collar is not measured)
 - **Scoring**: [pyannote.metrics](https://pyannote.github.io/pyannote-metrics/) DiarizationErrorRate, `skip_overlap=False` — overlapping speech is scored, not excluded
-- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 1.0s (turns of 2s or more are scored; the 2026-08-29 text said 0.5s, but `over_split_diagnostic.py` uses 1.0s); a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
+- **Turn-level metrics**: a turn is consecutive same-speaker reference speech merged across gaps ≤ 1.0s (turns of 2s or more are scored); a turn counts as correctly attributed when the majority of the transcribed time in its span carries that speaker's (optimally mapped) label; "spoken over someone" means more than half the turn coincides with another speaker's reference speech
+- **Live speaker metrics (2026-11-27)**: deterministic audio-clock replays use `--replay-live-labels` (first 10 min of AMI, full NOTSOFAR-1); real-time replays use `--replay-live-meeting` at `1×` serially on Apple M1 Max. Both run with default parameters and cold start (no voice profiles).
 - **Diarization**: Pyannote Community-1 via [FluidAudio](https://github.com/FluidInference/FluidAudio) CoreML, with NVIDIA Nemotron 3 Diarization (FluidAudio CoreML, CPU)
-- **ASR**: Parakeet TDT 0.6B v3 via FluidAudio CoreML. Every run behind these numbers used v3; the app now ships Parakeet Ultra, which has not been scored here.
+- **ASR**: Post-stop 2026-09-29 runs used Parakeet TDT 0.6B v3; 2026-11-27 live speaker runs use the shipped Parakeet Ultra spoken-form fine-tune via FluidAudio CoreML.
 - **LLM**: Gemini 3.1 Flash Lite (temp 0.1, thinking minimal)
 
 ## Reproducibility
 
-The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). The 2026-08-29 run was produced at `parakeet-transcriber` commit `5c847cf5` with default parameters. The 2026-09-29 runs were produced at commit `db5059662` (without Nemotron) and `9677ee3be` (with Nemotron 3, the shipping configuration).
+The deterministic pipeline runs end-to-end in Swift; Python only does scoring (and, separately, the LLM step — which does not produce the published score). Post-stop 2026-09-29 runs were produced at `parakeet-transcriber` commits `db5059662` (without Nemotron) and `9677ee3be` (with Nemotron 3). The 2026-11-27 live speaker measurements were produced at commit `541309fd0` with default parameters.
 
-```
+```bash
+# Post-stop deterministic diarization (57-file corpus)
 swift build -c release
 .build/release/mimicscribe --benchmark-pipeline-corpus
 PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 -m mimicscribe_bench.runner
-```
 
-The first command runs the deterministic pipeline on the 57-file corpus and writes per-file post-clustering segments plus per-stage timings. The second scores them against the ground-truth RTTMs (pyannote.metrics, optimal mapping, 0.25s collar). Both halves persist progress per file. Audio source paths and ground-truth RTTMs come from the public corpora linked above.
+# Live speaker separation & labeling (single meeting example, default parameters)
+.build/release/mimicscribe --replay-live-labels --raw-mic <silent.wav> --system <meeting.wav> --out-dir <out> --max-seconds 600
+.build/release/mimicscribe --replay-live-meeting --raw-mic <silent.wav> --system <meeting.wav> --out-dir <out> --max-seconds 300
+PYTHONPATH=benchmark/src benchmark/.venv313/bin/python3 benchmark/results/live-first/scripts/live_saa_score.py <arm_dir>
+python3 benchmark/results/live-first/scripts/r1025/ab_score.py --until 570 SHIP=<meeting_dirs_csv>
+python3 benchmark/results/live-first/scripts/break_latency.py --strict-sep --channel sys <meeting_dirs...>
+```
 
 ## Publication history
 
@@ -217,5 +242,6 @@ Every published run of this benchmark, oldest to newest. The full text of each v
 | 2026-08-25 | 57 | 98.1% | ASR recovery work: missed speech 8.2% → 6.6% with confusion flat at 1.9%; short-turn attribution up in every bucket |
 | 2026-08-29 | 57 | 98.3% | Word timings no longer overrun the audio that produced them: confusion 1.9% → 1.7% with missed speech 6.6% → 6.8%; substantial-turn misattribution 44 → 41 of 2,987; phantom rows 10 → 9 |
 | 2026-09-29 | 57 | **98.4%** | Current main: DER fell on four of five corpora (AMI 26.1% → 24.9%); NOTSOFAR-1 (80 meetings) added at 91.7%, not tuned on. With NVIDIA Nemotron 3 Diarization: **98.9%**, NOTSOFAR-1 98.8% |
+| 2026-11-27 | 10 live | **97.3% live** | Live speaker separation & labeling update (`541309fd0`): cold-start 4-file overlap live SAA `94.7% → 96.5%`; 10-meeting cold-start `97.3%` live SAA (`9/10` exact speaker counts, `80.9%` right at `+10 s`); added quiet `1×` real-time turn-separation latency (`9.4 s` median after change, `6.0 s` after words appear) |
 
 Aggregates are comparable only within the same file basis: 58 → 52 removed the Podcast corpus (May 2026); 52 → 57 added DiPCo (July 2026). On the shared 52-file basis, the 2026-07-17 and 2026-08-25 runs both score 98.2% and the 2026-08-29 run scores 98.3%.
